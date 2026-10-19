@@ -31,6 +31,8 @@ async function check(name, fn) {
   }
 }
 const R = (page, fn, arg) => page.evaluate(fn, arg);
+// Wait until the views have redrawn, so screen positions read from them (e.g. the now dot) are current.
+const nextFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
 // ---------- desktop ----------
 {
@@ -169,7 +171,7 @@ const R = (page, fn, arg) => page.evaluate(fn, arg);
       window.rendezvous.store.loadPreset('phasing');
       window.rendezvous.clock.setTime(3900);
     });
-    await page.waitForTimeout(100);
+    await nextFrame(page);
     const canvas = page.locator('#view-plot canvas');
     const box = await canvas.boundingBox();
     const plot = await R(page, () => window.rendezvous.views.plot.nowPt);
@@ -200,11 +202,11 @@ const R = (page, fn, arg) => page.evaluate(fn, arg);
     await page.keyboard.press('Escape');
     const canvas = page.locator('#view-plot canvas');
     const box = await canvas.boundingBox();
+    await nextFrame(page);
     const p = await R(page, () => window.rendezvous.views.plot.nowPt);
     await page.mouse.click(box.x + p.x, box.y + p.y, { button: 'right' });
-    await page.waitForTimeout(50);
     const item = page.locator('.menu-item', { hasText: 'Add burn here' });
-    assert.ok(await item.isVisible());
+    await item.waitFor({ state: 'visible', timeout: 2000 });
     const n = await R(page, () => window.rendezvous.store.scenario.burns.length);
     await item.click();
     assert.equal(await R(page, () => window.rendezvous.store.scenario.burns.length), n + 1);
