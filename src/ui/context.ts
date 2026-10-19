@@ -1,9 +1,11 @@
 import type { Store } from '../state/store';
 import type { Clock } from '../state/clock';
+import type { ViewSettings } from '../state/viewSettings';
 
 export interface AppCtx {
   store: Store;
   clock: Clock;
+  settings: ViewSettings;
   /** Ask for a redraw on the next animation frame. */
   invalidate(): void;
 }

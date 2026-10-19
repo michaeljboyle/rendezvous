@@ -28,6 +28,9 @@ const shots = [
   { name: 'phone-lvlh', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=lvlh', mobile: true },
   { name: 'phone-editor', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true, edit: true },
   { name: 'phone-landscape', vp: { width: 844, height: 390 }, q: '?preset=phasing&t=3900', mobile: true },
+  // Chaser 350 km circular, ~300 km behind: it must sit on its Ap/Pe line(s) in both coordinate modes.
+  { name: 'lvlh-long-range-curv', vp: { width: 1440, height: 1000 }, q: '?preset=phasing&t=1620', lvlhManual: { span: 80000, v: -250000, r: -40000 }, clip: '#view-lvlh' },
+  { name: 'lvlh-long-range-rect', vp: { width: 1440, height: 1000 }, q: '?preset=phasing&t=1620', lvlhManual: { span: 80000, v: -250000, r: -40000 }, rect: true, clip: '#view-lvlh' },
   { name: 'desktop-vbar', vp: { width: 1440, height: 1000 }, q: '?preset=vbar&t=4000' },
   { name: 'desktop-rbar', vp: { width: 1440, height: 1000 }, q: '?preset=rbar&t=2000' },
   { name: 'desktop-undock', vp: { width: 1440, height: 1000 }, q: '?preset=undock&t=7000' },
@@ -49,8 +52,20 @@ for (const s of shots) {
       r.store.updateDraft((b) => (b.dv.s = 18.8));
     });
   }
+  if (s.rect) await page.evaluate(() => window.rendezvous.settings.setCoords('rect'));
+  if (s.lvlhManual) {
+    await page.evaluate((m) => {
+      const v = window.rendezvous.views.lvlh;
+      v.mode = 'manual';
+      v.seg.set('manual');
+      v.manualSpan = m.span;
+      v.center = { v: m.v, r: m.r };
+      window.rendezvous.clock.setTime(window.rendezvous.clock.t);
+    }, s.lvlhManual);
+  }
   await page.waitForTimeout(500);
-  await page.screenshot({ path: `screenshots/${s.name}.png` });
+  if (s.clip) await page.locator(s.clip).screenshot({ path: `screenshots/${s.name}.png` });
+  else await page.screenshot({ path: `screenshots/${s.name}.png` });
   await ctx.close();
 }
 await browser.close();

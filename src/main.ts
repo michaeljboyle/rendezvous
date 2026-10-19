@@ -9,6 +9,7 @@ import './styles/app.css';
 import { presetById } from './scenarios/presets';
 import { Clock } from './state/clock';
 import { Store } from './state/store';
+import { ViewSettings } from './state/viewSettings';
 import { decodeShareHash, loadLocal, saveLocal } from './state/persist';
 import { BurnEditor } from './ui/BurnEditor';
 import type { AppCtx, View } from './ui/context';
@@ -38,10 +39,12 @@ if (location.hash.startsWith('#s=')) history.replaceState(null, '', location.pat
 
 const store = new Store(initial.scenario, initial.presetId, initial.edited);
 const clock = new Clock();
+const settings = new ViewSettings();
 let dirty = true;
 const app: AppCtx = {
   store,
   clock,
+  settings,
   invalidate: () => {
     dirty = true;
   },
@@ -65,6 +68,7 @@ store.subscribe((reason) => {
   saveTimer = window.setTimeout(() => saveLocal({ scenario: store.editing ? store.editing.snapshot : store.scenario, presetId: store.presetId, edited: store.edited }), 300);
 });
 clock.subscribe(() => (dirty = true));
+settings.subscribe(() => (dirty = true));
 
 // ----- components -----
 const inertial = new InertialView(app);
@@ -280,4 +284,4 @@ document.fonts?.ready.then(() => (dirty = true));
 if (hashError) toast(`Share link could not be read: ${hashError}`, 'error');
 
 // Expose for automated checks (Playwright) and debugging.
-(window as unknown as { rendezvous: unknown }).rendezvous = { store, clock, views: { inertial, lvlh, plot }, header };
+(window as unknown as { rendezvous: unknown }).rendezvous = { store, clock, settings, views: { inertial, lvlh, plot }, header };

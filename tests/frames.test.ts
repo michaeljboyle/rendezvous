@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { circularState, propagate } from '../src/physics/kepler';
 import { RE } from '../src/physics/constants';
-import { fromCurvilinear, localAxes, toCurvilinear, toLvlh } from '../src/physics/frames';
+import { altitudeArcR, fromCurvilinear, localAxes, toCurvilinear, toLvlh } from '../src/physics/frames';
 import { applyBurn } from '../src/physics/burns';
 
 const rt = RE + 420e3;
@@ -69,5 +69,18 @@ describe('ECI → LVLH', () => {
     expect(maxV - minV).toBeLessThan(360);
     const end = toLvlh(propagate(T0, P), propagate(c0, P));
     expect(Math.hypot(end.v, end.r)).toBeLessThan(1);
+  });
+});
+
+describe('constant-altitude arcs in rectilinear LVLH', () => {
+  it('a circular Chaser lies exactly on its own altitude arc, far below a straight line at long range', () => {
+    // 350 km circular, 293 km behind the 420 km Target (the case where a horizontal line misleads).
+    const rc = RE + 350e3;
+    const c = fromCurvilinear(T0, { v: (-293e3 * rc) / rt, r: rc - rt, vv: 0, vr: 0 });
+    const l = toLvlh(T0, c);
+    expect(altitudeArcR(rc, rt, l.v)).toBeCloseTo(l.r, 3);
+    expect(rc - rt - l.r).toBeGreaterThan(6000); // ≈ V²/2r ≈ 6.3 km below the straight line
+    expect(altitudeArcR(rt, rt, 0)).toBe(0);
+    expect(Number.isNaN(altitudeArcR(rt, rt, 2 * rt))).toBe(true);
   });
 });

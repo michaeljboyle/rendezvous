@@ -1,10 +1,13 @@
 import { RE } from '../physics/constants';
+import { altitudeArcR } from '../physics/frames';
 import { chaserElementsAt, relativeAt, sampleIndex, type Timeline } from '../physics/timeline';
 import { dvMagnitude } from '../physics/burns';
 import type { AppCtx, View } from '../ui/context';
 import { closePopover, h, icon, menuAt, popover, setText } from '../ui/dom';
 import { countdown, dist, dv, met, metShort, num, tick as fmtTick } from '../ui/format';
 import { panel } from '../ui/panel';
+import { coordsCheck, coordsChip } from '../ui/coords';
+import type { Coords } from '../state/viewSettings';
 import { Surface } from './canvas';
 import { DASH, drawBurnMarker, drawChaser, drawTarget, label, mono, niceStep, ticks } from './draw';
 import { attachGestures, type Pt } from './gestures';
@@ -76,7 +79,10 @@ interface Box {
 /** View 3 — the whole-scenario rendezvous plot in Target LVLH. */
 export class RendezvousPlot implements View {
   el: HTMLElement;
-  coords: 'curv' | 'rect' = 'curv';
+  /** LVLH coordinates, shared with the LVLH-now view. */
+  get coords(): Coords {
+    return this.app.settings.coords;
+  }
   mode: 'auto' | 'manual' = 'auto';
   trueShape = false;
   lockAspect = false;
@@ -100,16 +106,7 @@ export class RendezvousPlot implements View {
   constructor(private app: AppCtx) {
     const p = panel('view-plot', 'Rendezvous plot', 'Target LVLH, whole scenario', 'Rendezvous plot');
     this.el = p.el;
-    this.coordBtn = h('button', {
-      type: 'button',
-      class: 'chip hide-phone',
-      title: 'Curvilinear: V-bar is arc length along the Target orbit, R-bar is altitude difference. Click for rectilinear.',
-      onclick: () => {
-        this.coords = this.coords === 'curv' ? 'rect' : 'curv';
-        this.coordBtn.textContent = this.coords === 'curv' ? 'Curvilinear' : 'Rectilinear';
-        app.invalidate();
-      },
-    }, 'Curvilinear');
+    this.coordBtn = coordsChip(app);
     this.segBtns = (['auto', 'manual'] as const).map((m) =>
       h('button', { type: 'button', class: 'seg-btn', 'aria-pressed': String(m === this.mode), onclick: () => (m === 'auto' ? this.setAuto() : this.toManual()) }, m === 'auto' ? 'Auto' : 'Manual'),
     );
@@ -270,12 +267,6 @@ export class RendezvousPlot implements View {
       i.addEventListener('change', apply);
       i.addEventListener('keydown', (e) => e.key === 'Enter' && apply());
     }
-    const curv = h('input', { type: 'checkbox', checked: this.coords === 'curv' });
-    curv.addEventListener('change', () => {
-      this.coords = curv.checked ? 'curv' : 'rect';
-      this.coordBtn.textContent = this.coords === 'curv' ? 'Curvilinear' : 'Rectilinear';
-      this.app.invalidate();
-    });
     lock.addEventListener('change', () => (this.lockAspect = lock.checked));
     shape.addEventListener('change', () => {
       this.trueShape = shape.checked;
@@ -287,7 +278,7 @@ export class RendezvousPlot implements View {
       h('div', { class: 'pop-title' }, `Plot axes (${unit})`),
       h('div', { class: 'field-row' }, h('label', { class: 'field' }, h('span', null, 'V-bar min'), vMin), h('label', { class: 'field' }, h('span', null, 'V-bar max'), vMax)),
       h('div', { class: 'field-row' }, h('label', { class: 'field' }, h('span', null, 'R-bar min'), rMin), h('label', { class: 'field' }, h('span', null, 'R-bar max'), rMax)),
-      h('label', { class: 'check' }, curv, h('span', null, 'Curvilinear coordinates (arc length, altitude)')),
+      coordsCheck(this.app),
       h('label', { class: 'check' }, lock, h('span', null, 'Lock aspect (zoom both axes together)')),
       h('label', { class: 'check' }, shape, h('span', null, 'True shape in Auto (equal scale)')),
       h('p', { class: 'hint' }, 'Wheel zooms both axes, Shift+wheel V-bar, Alt+wheel R-bar. Drag the tick labels to stretch one axis.'),
@@ -454,24 +445,35 @@ export class RendezvousPlot implements View {
     c.setLineDash([2, 4]);
     c.strokeStyle = alpha(th.chaser, 0.8);
     c.lineWidth = 1.2;
+    // Curvilinear: constant altitude is a horizontal line. Rectilinear: it is an arc about Earth's centre.
     const apPe: [number, string][] = [];
-    if (el.e < 1) apPe.push([el.ra - rt, `Ap ${num((el.ra - RE) / 1000, 1)} km`]);
-    apPe.push([el.rp - rt, `Pe ${num((el.rp - RE) / 1000, 1)} km`]);
-    for (const [r] of apPe) {
-      const y = this.Y(r);
-      if (y < this.py0 - 2 || y > this.py1 + 2) continue;
+    if (el.e < 1) apPe.push([el.ra, `Ap ${num((el.ra - RE) / 1000, 1)} km`]);
+    apPe.push([el.rp, `Pe ${num((el.rp - RE) / 1000, 1)} km`]);
+    const arcR = (radius: number, v: number) => (this.coords === 'curv' ? radius - rt : altitudeArcR(radius, rt, v));
+    for (const [radius] of apPe) {
       c.beginPath();
-      c.moveTo(this.px0, y);
-      c.lineTo(this.px1, y);
+      let started = false;
+      const N = this.coords === 'curv' ? 1 : 120;
+      for (let k = 0; k <= N; k++) {
+        const v = cur.vMax - ((cur.vMax - cur.vMin) * k) / N;
+        const y = this.Y(arcR(radius, v));
+        if (!Number.isFinite(y)) {
+          started = false;
+          continue;
+        }
+        if (started) c.lineTo(this.X(v), y);
+        else c.moveTo(this.X(v), y);
+        started = true;
+      }
       c.stroke();
     }
     c.setLineDash([]);
     mono(c, 11);
     c.textAlign = 'right';
     c.textBaseline = 'bottom';
-    for (const [r, text] of apPe) {
-      const y = this.Y(r);
-      if (y < this.py0 + 10 || y > this.py1 + 2) continue;
+    for (const [radius, text] of apPe) {
+      const y = this.Y(arcR(radius, cur.vMin));
+      if (!Number.isFinite(y) || y < this.py0 + 10 || y > this.py1 + 2) continue;
       const w = c.measureText(text).width;
       const box = { x0: this.px1 - 6 - w, y0: y - 16, x1: this.px1 - 6, y1: y - 2 };
       if (this.collides(box, placed)) continue;
