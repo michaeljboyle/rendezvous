@@ -5,6 +5,7 @@ import type { AppCtx, View } from '../ui/context';
 import { closePopover, h, icon, popover, segmented, setText } from '../ui/dom';
 import { countdown, dist, distPair, dv, num, span as fmtSpan, speed } from '../ui/format';
 import { panel, telemetryItem } from '../ui/panel';
+import { coordsCheck, coordsChip } from '../ui/coords';
 import { Surface } from './canvas';
 import { arrow, drawChaser, drawTarget, fadingPolyline, label, mono, niceStep, ticks } from './draw';
 import { attachGestures, type Pt } from './gestures';
@@ -47,7 +48,7 @@ export class LvlhView implements View {
   private now = 0;
 
   constructor(private app: AppCtx) {
-    const p = panel('view-lvlh', 'LVLH · now', 'Target-centered, true scale', 'LVLH current position');
+    const p = panel('view-lvlh', 'LVLH · now', 'Target-centered, equal scale', 'LVLH current position');
     this.el = p.el;
     this.kosBtn = h(
       'button',
@@ -75,7 +76,7 @@ export class LvlhView implements View {
       'hide-phone',
     );
     this.chip = h('button', { type: 'button', class: 'chip chip-mono', 'aria-haspopup': 'dialog', 'aria-label': 'Axis range, opens axis settings', onclick: () => this.openPopover() }, this.chipText, icon('chevronDown', 12, 2));
-    p.controls.append(this.kosBtn, this.seg.el, this.chip);
+    p.controls.append(coordsChip(app), this.kosBtn, this.seg.el, this.chip);
 
     for (const [key, lab] of [
       ['range', 'Range'],
@@ -167,6 +168,7 @@ export class LvlhView implements View {
       h('div', { class: 'pop-title' }, 'LVLH axes'),
       h('label', { class: 'field' }, h('span', null, 'Span ± (km)'), spanIn),
       h('div', { class: 'field-row' }, h('label', { class: 'field' }, h('span', null, 'Centre V-bar (km)'), vIn), h('label', { class: 'field' }, h('span', null, 'Centre R-bar (km)'), rIn)),
+      coordsCheck(this.app),
       this.overlayCheck(),
       h('p', { class: 'hint' }, 'Both axes share one scale. Drag to pan, scroll or pinch to zoom, double-click to return to Auto.'),
       h(
@@ -195,12 +197,15 @@ export class LvlhView implements View {
     const { store } = this.app;
     const tl = store.timeline;
     const rel = relativeAt(tl, t);
-    this.updateTelemetry(t, rel.range, rel.rangeRate, rel.rect.v, rel.rect.r);
+    // Curvilinear (default) or rectilinear, shared with the rendezvous plot.
+    const curvilinear = this.app.settings.coords === 'curv';
+    const pos = curvilinear ? rel.curv : rel.rect;
+    this.updateTelemetry(t, rel.range, rel.rangeRate, pos.v, pos.r);
 
     // Scale
     let span: number;
     if (this.mode === 'auto') {
-      const step = autoStep(rel.range);
+      const step = autoStep(Math.max(rel.range, Math.hypot(pos.v, pos.r)));
       if (step !== this.easeTo) {
         this.easeFrom = this.shown;
         this.easeTo = step;
@@ -268,7 +273,9 @@ export class LvlhView implements View {
     // Ap / Pe lines
     const el = chaserElementsAt(tl, t);
     const rt = tl.targetRadius;
-    this.apPeLines(c, el.e < 1 ? el.ra : NaN, el.rp, rt, X, Y, vMin, vMax);
+    // Constant altitude is a horizontal line in curvilinear coordinates and an arc in rectilinear ones.
+    const arcR = (radius: number, v: number) => (curvilinear ? radius - rt : altitudeArcR(radius, rt, v));
+    this.apPeLines(c, el.e < 1 ? el.ra : NaN, el.rp, arcR, X, Y, vMin, vMax);
 
     // Overlays: keep-out sphere and approach ellipsoid
     if (this.overlays) {
@@ -298,11 +305,11 @@ export class LvlhView implements View {
     const xs: number[] = [];
     const ys: number[] = [];
     for (let i = i0; i <= i1; i++) {
-      xs.push(X(tl.rectV[i]));
-      ys.push(Y(tl.rectR[i]));
+      xs.push(X(curvilinear ? tl.curvV[i] : tl.rectV[i]));
+      ys.push(Y(curvilinear ? tl.curvR[i] : tl.rectR[i]));
     }
-    const cx = X(rel.rect.v);
-    const cy = Y(rel.rect.r);
+    const cx = X(pos.v);
+    const cy = Y(pos.r);
     xs.push(cx);
     ys.push(cy);
     fadingPolyline(c, xs, ys, th.chaser, 2, 0, 1);
@@ -311,11 +318,11 @@ export class LvlhView implements View {
     drawTarget(c, X(0), Y(0), 10);
 
     // Relative velocity arrow (length ∝ speed: displacement over 1/12 orbit)
-    const vmag = Math.hypot(rel.rect.vv, rel.rect.vr);
+    const vmag = Math.hypot(pos.vv, pos.vr);
     if (vmag > 1e-4) {
       const len = Math.max(12, Math.min(Math.min(S.w, S.h) * 0.35, vmag * (tl.targetPeriod / 12) * s));
-      const dx = -rel.rect.vv / vmag;
-      const dy = -rel.rect.vr / vmag;
+      const dx = -pos.vv / vmag;
+      const dy = -pos.vr / vmag;
       arrow(c, cx, cy, cx + dx * len, cy + dy * len, th.chaser, 1.6, 7);
       mono(c, 12);
       c.textBaseline = 'middle';
@@ -324,10 +331,10 @@ export class LvlhView implements View {
     }
     drawChaser(c, cx, cy, 5.5);
     mono(c, 12);
-    const arrowLeft = vmag > 1e-4 && -rel.rect.vv / vmag < 0;
+    const arrowLeft = vmag > 1e-4 && -pos.vv / vmag < 0;
     c.textAlign = arrowLeft || vmag <= 1e-4 ? 'left' : 'right';
     c.textBaseline = 'middle';
-    label(c, 'Chaser', arrowLeft || vmag <= 1e-4 ? cx + 10 : cx - 10, cy + (-rel.rect.vr / Math.max(vmag, 1e-9) < 0 ? 12 : -12), th.chaser);
+    label(c, 'Chaser', arrowLeft || vmag <= 1e-4 ? cx + 10 : cx - 10, cy + (-pos.vr / Math.max(vmag, 1e-9) < 0 ? 12 : -12), th.chaser);
 
     // Scale bar
     const bar = scaleBarLength(span / 3.5);
@@ -349,11 +356,11 @@ export class LvlhView implements View {
   }
 
   /**
-   * Chaser apoapsis / periapsis altitudes as dotted constant-altitude arcs. This view is rectilinear,
-   * so a constant altitude is a circle about Earth's centre, not a horizontal line; the Chaser always
-   * lies between its Ap and Pe arcs.
+   * Chaser apoapsis / periapsis altitudes as dotted constant-altitude curves (`arcR` gives R-bar at V):
+   * straight lines in curvilinear coordinates, arcs about Earth's centre in rectilinear ones. Either
+   * way the Chaser always lies between its Ap and Pe curves.
    */
-  private apPeLines(c: CanvasRenderingContext2D, ra: number, rp: number, rt: number, X: (v: number) => number, Y: (r: number) => number, vMin: number, vMax: number): void {
+  private apPeLines(c: CanvasRenderingContext2D, ra: number, rp: number, arcR: (radius: number, v: number) => number, X: (v: number) => number, Y: (r: number) => number, vMin: number, vMax: number): void {
     const th = theme();
     const w = this.surface.w;
     c.save();
@@ -366,7 +373,7 @@ export class LvlhView implements View {
     if (Number.isFinite(ra)) lines.push([ra, `Ap ${num((ra - RE) / 1000, 1)} km`]);
     lines.push([rp, `Pe ${num((rp - RE) / 1000, 1)} km`]);
     // Labels sit at the right edge, which is the most negative V on screen (+V-bar points left).
-    const yAt = (r: number) => Y(altitudeArcR(r, rt, vMin));
+    const yAt = (r: number) => Y(arcR(r, vMin));
     const same = lines.length === 2 && Math.abs(yAt(lines[0][0]) - yAt(lines[1][0])) < 14;
     const N = 96;
     lines.forEach(([r, text], i) => {
@@ -374,7 +381,7 @@ export class LvlhView implements View {
       let started = false;
       for (let k = 0; k <= N; k++) {
         const v = vMin + ((vMax - vMin) * k) / N;
-        const y = Y(altitudeArcR(r, rt, v));
+        const y = Y(arcR(r, v));
         if (!Number.isFinite(y)) {
           started = false;
           continue;

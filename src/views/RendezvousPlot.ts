@@ -6,6 +6,8 @@ import type { AppCtx, View } from '../ui/context';
 import { closePopover, h, icon, menuAt, popover, setText } from '../ui/dom';
 import { countdown, dist, dv, met, metShort, num, tick as fmtTick } from '../ui/format';
 import { panel } from '../ui/panel';
+import { coordsCheck, coordsChip } from '../ui/coords';
+import type { Coords } from '../state/viewSettings';
 import { Surface } from './canvas';
 import { DASH, drawBurnMarker, drawChaser, drawTarget, label, mono, niceStep, ticks } from './draw';
 import { attachGestures, type Pt } from './gestures';
@@ -77,7 +79,10 @@ interface Box {
 /** View 3 — the whole-scenario rendezvous plot in Target LVLH. */
 export class RendezvousPlot implements View {
   el: HTMLElement;
-  coords: 'curv' | 'rect' = 'curv';
+  /** LVLH coordinates, shared with the LVLH-now view. */
+  get coords(): Coords {
+    return this.app.settings.coords;
+  }
   mode: 'auto' | 'manual' = 'auto';
   trueShape = false;
   lockAspect = false;
@@ -101,16 +106,7 @@ export class RendezvousPlot implements View {
   constructor(private app: AppCtx) {
     const p = panel('view-plot', 'Rendezvous plot', 'Target LVLH, whole scenario', 'Rendezvous plot');
     this.el = p.el;
-    this.coordBtn = h('button', {
-      type: 'button',
-      class: 'chip hide-phone',
-      title: 'Curvilinear: V-bar is arc length along the Target orbit, R-bar is altitude difference. Click for rectilinear.',
-      onclick: () => {
-        this.coords = this.coords === 'curv' ? 'rect' : 'curv';
-        this.coordBtn.textContent = this.coords === 'curv' ? 'Curvilinear' : 'Rectilinear';
-        app.invalidate();
-      },
-    }, 'Curvilinear');
+    this.coordBtn = coordsChip(app);
     this.segBtns = (['auto', 'manual'] as const).map((m) =>
       h('button', { type: 'button', class: 'seg-btn', 'aria-pressed': String(m === this.mode), onclick: () => (m === 'auto' ? this.setAuto() : this.toManual()) }, m === 'auto' ? 'Auto' : 'Manual'),
     );
@@ -271,12 +267,6 @@ export class RendezvousPlot implements View {
       i.addEventListener('change', apply);
       i.addEventListener('keydown', (e) => e.key === 'Enter' && apply());
     }
-    const curv = h('input', { type: 'checkbox', checked: this.coords === 'curv' });
-    curv.addEventListener('change', () => {
-      this.coords = curv.checked ? 'curv' : 'rect';
-      this.coordBtn.textContent = this.coords === 'curv' ? 'Curvilinear' : 'Rectilinear';
-      this.app.invalidate();
-    });
     lock.addEventListener('change', () => (this.lockAspect = lock.checked));
     shape.addEventListener('change', () => {
       this.trueShape = shape.checked;
@@ -288,7 +278,7 @@ export class RendezvousPlot implements View {
       h('div', { class: 'pop-title' }, `Plot axes (${unit})`),
       h('div', { class: 'field-row' }, h('label', { class: 'field' }, h('span', null, 'V-bar min'), vMin), h('label', { class: 'field' }, h('span', null, 'V-bar max'), vMax)),
       h('div', { class: 'field-row' }, h('label', { class: 'field' }, h('span', null, 'R-bar min'), rMin), h('label', { class: 'field' }, h('span', null, 'R-bar max'), rMax)),
-      h('label', { class: 'check' }, curv, h('span', null, 'Curvilinear coordinates (arc length, altitude)')),
+      coordsCheck(this.app),
       h('label', { class: 'check' }, lock, h('span', null, 'Lock aspect (zoom both axes together)')),
       h('label', { class: 'check' }, shape, h('span', null, 'True shape in Auto (equal scale)')),
       h('p', { class: 'hint' }, 'Wheel zooms both axes, Shift+wheel V-bar, Alt+wheel R-bar. Drag the tick labels to stretch one axis.'),

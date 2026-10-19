@@ -222,6 +222,16 @@ const R = (page, fn, arg) => page.evaluate(fn, arg);
     assert.equal(await R(page, () => window.rendezvous.views.lvlh.mode), 'auto');
   });
 
+  await check('LVLH coordinates: curvilinear by default, one toggle shared by both LVLH views', async () => {
+    assert.equal(await R(page, () => window.rendezvous.settings.coords), 'curv');
+    await page.locator('#view-lvlh .chip', { hasText: 'Curvilinear' }).click();
+    assert.equal(await R(page, () => window.rendezvous.settings.coords), 'rect');
+    assert.equal(await page.locator('#view-plot .chip', { hasText: 'Rectilinear' }).count(), 1);
+    await page.locator('#view-plot .chip', { hasText: 'Rectilinear' }).click();
+    assert.equal(await R(page, () => window.rendezvous.settings.coords), 'curv');
+    assert.equal(await page.locator('#view-lvlh .chip', { hasText: 'Curvilinear' }).count(), 1);
+  });
+
   await check('keyboard focus is visible (focus ring uses --accent)', async () => {
     await page.locator('body').click({ position: { x: 5, y: 5 } });
     await page.keyboard.press('Tab');
