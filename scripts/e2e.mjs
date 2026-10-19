@@ -44,8 +44,8 @@ const R = (page, fn, arg) => page.evaluate(fn, arg);
   await page.waitForTimeout(300);
   console.log('desktop 1440×900');
 
-  await check('all three views and the burn drawer are visible', async () => {
-    for (const id of ['#view-inertial', '#view-lvlh', '#view-plot', '.editor']) assert.ok(await page.locator(id).isVisible(), id);
+  await check('both views and the burn drawer are visible', async () => {
+    for (const id of ['#view-inertial', '#view-plot', '.editor']) assert.ok(await page.locator(id).isVisible(), id);
     assert.match(await page.locator('.panel-head').first().innerText(), /Altitude ×30/);
   });
 
@@ -164,7 +164,7 @@ const R = (page, fn, arg) => page.evaluate(fn, arg);
     assert.equal(await R(page, () => window.rendezvous.store.scenario.name), 'V-bar approach');
   });
 
-  await check('rendezvous plot: drag the now dot scrubs; wheel switches to Manual; Manual survives edits; double-click restores Auto', async () => {
+  await check('rendezvous plot: drag the now dot scrubs; wheel switches to Manual; Manual survives edits; double-click restores Fit', async () => {
     await R(page, () => {
       window.rendezvous.store.loadPreset('phasing');
       window.rendezvous.clock.setTime(3900);
@@ -193,7 +193,7 @@ const R = (page, fn, arg) => page.evaluate(fn, arg);
     await page.waitForTimeout(50);
     assert.equal(await R(page, () => JSON.stringify(window.rendezvous.views.plot.manual)), m1);
     await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
-    assert.equal(await R(page, () => window.rendezvous.views.plot.mode), 'auto');
+    assert.equal(await R(page, () => window.rendezvous.views.plot.mode), 'fit');
   });
 
   await check('right-click on the trajectory offers "Add burn here"', async () => {
@@ -211,25 +211,49 @@ const R = (page, fn, arg) => page.evaluate(fn, arg);
     await page.locator('.btn-cancel').click();
   });
 
-  await check('LVLH view: wheel → Manual, Reset to Auto from the popover', async () => {
-    const canvas = page.locator('#view-lvlh canvas');
-    const box = await canvas.boundingBox();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.wheel(0, 300);
-    assert.equal(await R(page, () => window.rendezvous.views.lvlh.mode), 'manual');
-    await page.locator('#view-lvlh .chip-mono').click();
-    await page.getByRole('button', { name: 'Reset to Auto' }).click();
-    assert.equal(await R(page, () => window.rendezvous.views.lvlh.mode), 'auto');
+  await check('Follow mode: Target-centred at equal scale, steps with range; Reset to Fit from the popover', async () => {
+    await R(page, () => window.rendezvous.clock.setTime(3900)); // range 51 km → 100 km step
+    await page.locator('#view-plot .seg-btn', { hasText: 'Follow' }).click();
+    await page.waitForTimeout(450); // let the 300 ms ease finish
+    const cur = await R(page, () => window.rendezvous.views.plot.cur);
+    assert.ok(Math.abs(cur.vMin + cur.vMax) < 1 && Math.abs(cur.rMin + cur.rMax) < 1, 'centred on the Target');
+    assert.ok(Math.abs(Math.min(cur.vMax, cur.rMax) - 100000) < 1, `span ${Math.min(cur.vMax, cur.rMax)}`);
+    assert.match(await page.locator('#view-plot .chip-mono').innerText(), /Follow · 100 km/);
+    await R(page, () => window.rendezvous.clock.setTime(5600)); // ~5 km behind → 20 km step
+    await page.waitForTimeout(450);
+    const cur2 = await R(page, () => window.rendezvous.views.plot.cur);
+    assert.ok(Math.abs(Math.min(cur2.vMax, cur2.rMax) - 20000) < 1, `span ${Math.min(cur2.vMax, cur2.rMax)}`);
+    await page.locator('#view-plot .chip-mono').click();
+    await page.getByRole('button', { name: 'Reset to Fit' }).click();
+    assert.equal(await R(page, () => window.rendezvous.views.plot.mode), 'fit');
   });
 
-  await check('LVLH coordinates: curvilinear by default, one toggle shared by both LVLH views', async () => {
+  await check('KOS / AE overlay toggles from the title row', async () => {
+    const btn = page.locator('#view-plot .chip', { hasText: 'KOS / AE' });
+    await btn.click();
+    assert.equal(await btn.getAttribute('aria-pressed'), 'true');
+    assert.ok(await R(page, () => window.rendezvous.views.plot.overlays));
+    await btn.click();
+    assert.ok(!(await R(page, () => window.rendezvous.views.plot.overlays)));
+  });
+
+  await check('plot telemetry shows range, rate, V/R and next burn', async () => {
+    await R(page, () => window.rendezvous.clock.setTime(3900));
+    await page.waitForTimeout(50);
+    const txt = await page.locator('#view-plot .plot-stats').innerText();
+    assert.match(txt, /51\.26 km/);
+    assert.match(txt, /−74\.96 m\/s/);
+    assert.match(txt, /26:08/);
+  });
+
+  await check('coordinates: curvilinear by default, toggles to rectilinear', async () => {
     assert.equal(await R(page, () => window.rendezvous.settings.coords), 'curv');
-    await page.locator('#view-lvlh .chip', { hasText: 'Curvilinear' }).click();
+    await page.locator('#view-plot .chip', { hasText: 'Curvilinear' }).click();
     assert.equal(await R(page, () => window.rendezvous.settings.coords), 'rect');
-    assert.equal(await page.locator('#view-plot .chip', { hasText: 'Rectilinear' }).count(), 1);
+    await page.waitForTimeout(50);
+    assert.match(await page.locator('#view-plot .plot-stats').innerText(), /V −29\.19\s+R −42\.14 km/); // CLAUDE.md cross-check
     await page.locator('#view-plot .chip', { hasText: 'Rectilinear' }).click();
     assert.equal(await R(page, () => window.rendezvous.settings.coords), 'curv');
-    assert.equal(await page.locator('#view-lvlh .chip', { hasText: 'Curvilinear' }).count(), 1);
   });
 
   await check('keyboard focus is visible (focus ring uses --accent)', async () => {

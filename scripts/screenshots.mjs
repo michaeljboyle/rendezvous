@@ -25,12 +25,14 @@ const shots = [
   { name: 'tablet', vp: { width: 1024, height: 768 }, q: '?preset=phasing&t=3900' },
   { name: 'phone-plot', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true },
   { name: 'phone-orbits', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=orbits', mobile: true },
-  { name: 'phone-lvlh', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=lvlh', mobile: true },
   { name: 'phone-editor', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true, edit: true },
   { name: 'phone-landscape', vp: { width: 844, height: 390 }, q: '?preset=phasing&t=3900', mobile: true },
   // Chaser 350 km circular, ~300 km behind: it must sit on its Ap/Pe line(s) in both coordinate modes.
-  { name: 'lvlh-long-range-curv', vp: { width: 1440, height: 1000 }, q: '?preset=phasing&t=1620', lvlhManual: { span: 80000, v: -250000, r: -40000 }, clip: '#view-lvlh' },
-  { name: 'lvlh-long-range-rect', vp: { width: 1440, height: 1000 }, q: '?preset=phasing&t=1620', lvlhManual: { span: 80000, v: -250000, r: -40000 }, rect: true, clip: '#view-lvlh' },
+  { name: 'plot-long-range-curv', vp: { width: 1440, height: 1000 }, q: '?preset=phasing&t=1620', plotManual: { vMin: -380000, vMax: -180000, rMin: -110000, rMax: 10000 }, clip: '#view-plot' },
+  { name: 'plot-long-range-rect', vp: { width: 1440, height: 1000 }, q: '?preset=phasing&t=1620', plotManual: { vMin: -380000, vMax: -180000, rMin: -110000, rMax: 10000 }, rect: true, clip: '#view-plot' },
+  // Follow mode close in, with the keep-out sphere and approach ellipsoid.
+  { name: 'plot-follow-vbar', vp: { width: 1440, height: 1000 }, q: '?preset=vbar&t=8000', follow: true, overlays: true, clip: '#view-plot' },
+  { name: 'phone-follow', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true, follow: true },
   { name: 'desktop-vbar', vp: { width: 1440, height: 1000 }, q: '?preset=vbar&t=4000' },
   { name: 'desktop-rbar', vp: { width: 1440, height: 1000 }, q: '?preset=rbar&t=2000' },
   { name: 'desktop-undock', vp: { width: 1440, height: 1000 }, q: '?preset=undock&t=7000' },
@@ -53,15 +55,16 @@ for (const s of shots) {
     });
   }
   if (s.rect) await page.evaluate(() => window.rendezvous.settings.setCoords('rect'));
-  if (s.lvlhManual) {
-    await page.evaluate((m) => {
-      const v = window.rendezvous.views.lvlh;
-      v.mode = 'manual';
-      v.seg.set('manual');
-      v.manualSpan = m.span;
-      v.center = { v: m.v, r: m.r };
-      window.rendezvous.clock.setTime(window.rendezvous.clock.t);
-    }, s.lvlhManual);
+  if (s.plotManual || s.follow || s.overlays) {
+    await page.evaluate((s) => {
+      const p = window.rendezvous.views.plot;
+      if (s.plotManual) {
+        p.setMode('manual');
+        p.manual = s.plotManual;
+      }
+      if (s.follow) p.setMode('follow');
+      if (s.overlays) p.setOverlays(true);
+    }, s);
   }
   await page.waitForTimeout(500);
   if (s.clip) await page.locator(s.clip).screenshot({ path: `screenshots/${s.name}.png` });

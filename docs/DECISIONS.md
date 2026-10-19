@@ -14,11 +14,17 @@ These are choices made while building v1 where the spec was silent, ambiguous, o
 
 ## Views
 
-8. **View 2 (LVLH now) is curvilinear by default, overriding the spec's rectilinear choice.** At long range, rectilinear coordinates put a circular Chaser visibly below its own Ap/Pe altitude: 293 km downrange it shows R −76.4 km for a 70 km altitude difference, because constant altitude curves away by about V²/2r. Inside a few km, where rectilinear matters, the two frames differ by centimetres to metres. One Curvilinear/Rectilinear setting is shared by Views 2 and 3, so they never disagree. In rectilinear mode the Ap/Pe markers are drawn as true constant-altitude arcs, not horizontal lines. The subtitle reads "equal scale" rather than "true scale". The V/R telemetry follows the selected frame; at T+01:05 it shows V −29.37 R −42.08 km in curvilinear, and the CLAUDE.md cross-check values (−29.19 / −42.14) appear in rectilinear.
-8a. **The View 2 velocity arrow shows the relative-velocity magnitude in LVLH** (84.6 m/s at T+01:05), as the spec describes. The mockup's label shows 75.0 m/s, which is the range rate. Arrow length is speed × (orbit period / 12), clamped so it stays visible.
-9. **View 2 Auto scale:** it picks the smallest step that is at least 1.08 × range. The span is the half-extent of the shorter canvas side. The chip reads "Auto · 100 km" as the spec says; the mockup shows only "100 km".
+8. **There is no separate LVLH-now view (spec View 2); the rendezvous plot does its job.** Everything View 2 showed is now on the plot:
+   - a **Follow** scaling mode: centred on the Target at equal scale, stepping 50 m → 200 m → 1 km → 5 km → 20 km → 100 km → 500 km with range and easing between steps over 300 ms
+   - the **KOS / AE** overlay (200 m keep-out sphere, 4 × 2 km approach ellipsoid), drawn in the plot's own scale
+   - the **relative-velocity arrow** with its speed readout
+   - View 2's telemetry: range, range rate, V/R and time to next burn
+
+   The scaling control reads **Fit · Follow · Manual**; Fit is the spec's Auto. Desktop shows Inertial | Plot side by side. Tablet puts both views on top and the burn editor across the bottom. Phone tabs are Orbits · Plot.
+9. **The plot is curvilinear by default** (V-bar = arc length, R-bar = altitude difference), with a Curvilinear/Rectilinear toggle. At long range, rectilinear coordinates put a circular Chaser visibly below its own Ap/Pe altitude: 293 km downrange it shows R −76.4 km for a 70 km altitude difference, because constant altitude curves away by about V²/2r. In rectilinear mode the Ap/Pe markers are therefore drawn as true constant-altitude arcs. The V/R telemetry follows the selected frame: at T+01:05 it reads V −29.37 R −42.08 km in curvilinear, and the CLAUDE.md cross-check values (−29.19 / −42.14) in rectilinear.
+9a. **The velocity arrow shows the relative-velocity magnitude** (85.0 m/s at T+01:05 in curvilinear), as the spec describes for View 2. The mockup's label shows 75.0 m/s, which is the range rate. The arrow is the Chaser's displacement over 1/12 of an orbit, mapped through the plot's axes so it follows the trajectory's slope even when the axes are stretched, and clamped so it stays readable.
 10. Clicking the altitude-exaggeration chip cycles through 1× → 10× → 30× → 100×. Follow Target mode zooms in 3.5× around the Target. Wheel, pinch and drag zoom and pan in both camera modes, and double-click fits.
-11. The View 3 **True shape** toggle lives in the axis popover, together with Lock aspect and the coordinates toggle. With Lock aspect on, single-axis zooms (Shift- or Alt-wheel, axis-label drags, one-direction pinches) zoom both axes.
+11. The plot's **True shape** toggle (equal scale in Fit) lives in the axis popover, together with Lock aspect, the coordinates toggle and KOS/AE. With Lock aspect on, single-axis zooms (Shift- or Alt-wheel, axis-label drags, one-direction pinches) zoom both axes.
 12. Disabled and out-of-range burns are not drawn in the views because they never happen. They stay greyed or flagged red in the list.
 13. Tick and label collisions are resolved by trying alternative positions and dropping a label that still collides. A crowded burn falls back to its number only.
 
@@ -35,7 +41,7 @@ These are choices made while building v1 where the spec was silent, ambiguous, o
 
 ## Layout
 
-22. **Phone:** the plot and LVLH title rows keep only the scale chip. Curvilinear, Auto/Manual and KOS/AE move into the axis popovers to fit 390 px, and any gesture still switches to Manual. Under the plot, the telemetry row shows Range / Range rate / Next burn as in the mockup, and a toggle collapses it.
+22. **Phone:** the plot's title row keeps only the scale chip. Curvilinear, Fit/Follow/Manual and KOS/AE move into the axis popover to fit 390 px, and any gesture still switches to Manual. On tablet only Curvilinear and KOS/AE move there. The telemetry row under each view collapses with a toggle.
 23. **Phone swipe** between views starts at the canvas edges (24 px) or on the title and telemetry rows, because a drag inside a canvas pans it.
 24. Undo/redo buttons sit in the burn drawer header on desktop and tablet, and in the ⋮ menu on phone.
 25. Phone landscape (height < 500 px) shows Orbits + Plot side by side with the sheet collapsed to its header.

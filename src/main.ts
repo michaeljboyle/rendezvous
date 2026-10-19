@@ -17,7 +17,6 @@ import { closePopover, h, icon, toast } from './ui/dom';
 import { Header } from './ui/Header';
 import { PlaybackBar } from './ui/PlaybackBar';
 import { InertialView } from './views/InertialView';
-import { LvlhView } from './views/LvlhView';
 import { RendezvousPlot } from './views/RendezvousPlot';
 import type { Scenario } from './scenarios/schema';
 
@@ -72,17 +71,16 @@ settings.subscribe(() => (dirty = true));
 
 // ----- components -----
 const inertial = new InertialView(app);
-const lvlh = new LvlhView(app);
 const plot = new RendezvousPlot(app);
-const views: View[] = [inertial, lvlh, plot];
+const views: View[] = [inertial, plot];
 const playback = new PlaybackBar(app);
 const header = new Header(app);
 const editor = new BurnEditor(app);
 
 // ----- layout skeleton -----
 type Layout = 'desktop' | 'tablet' | 'phone' | 'phone-landscape';
-type PhoneView = 'orbits' | 'lvlh' | 'plot';
-const PHONE_VIEWS: PhoneView[] = ['orbits', 'lvlh', 'plot'];
+type PhoneView = 'orbits' | 'plot';
+const PHONE_VIEWS: PhoneView[] = ['orbits', 'plot'];
 let phoneView: PhoneView = (params.get('view') as PhoneView) || 'plot';
 if (!PHONE_VIEWS.includes(phoneView)) phoneView = 'plot';
 
@@ -92,18 +90,16 @@ const centerSlot = h('div', { class: 'header-center' });
 const topbar = h('header', { class: 'topbar' }, logo, header.picker, centerSlot, header.actions, header.more);
 const scrubRow = h('div', { class: 'scrub-row' });
 const tabBtns = PHONE_VIEWS.map((v) =>
-  h('button', { type: 'button', role: 'tab', class: 'vt-btn', 'aria-selected': String(v === phoneView), onclick: () => setPhoneView(v) }, v === 'orbits' ? 'Orbits' : v === 'lvlh' ? 'LVLH' : 'Plot'),
+  h('button', { type: 'button', role: 'tab', class: 'vt-btn', 'aria-selected': String(v === phoneView), onclick: () => setPhoneView(v) }, v === 'orbits' ? 'Orbits' : 'Plot'),
 );
 const viewTabs = h('nav', { class: 'view-tabs', role: 'tablist', 'aria-label': 'View' }, ...tabBtns);
-const rightCol = h('div', { class: 'right-col' }, lvlh.el, plot.el);
-const viewsEl = h('main', { class: 'views' }, inertial.el, rightCol);
+const viewsEl = h('main', { class: 'views' }, inertial.el, plot.el);
 const drawer = h('div', { class: 'drawer' });
 const dock = h('div', { class: 'dock' });
 const sheetHandle = h('button', { type: 'button', class: 'sheet-handle', 'aria-label': 'Resize burn sheet' }, h('span', { class: 'grip' }));
 const sheet = h('div', { class: 'sheet', 'data-state': 'peek' }, sheetHandle);
 root.append(topbar, scrubRow, viewTabs, viewsEl, drawer, dock, sheet);
 inertial.el.dataset.view = 'orbits';
-lvlh.el.dataset.view = 'lvlh';
 plot.el.dataset.view = 'plot';
 
 function setPhoneView(v: PhoneView): void {
@@ -284,4 +280,4 @@ document.fonts?.ready.then(() => (dirty = true));
 if (hashError) toast(`Share link could not be read: ${hashError}`, 'error');
 
 // Expose for automated checks (Playwright) and debugging.
-(window as unknown as { rendezvous: unknown }).rendezvous = { store, clock, settings, views: { inertial, lvlh, plot }, header };
+(window as unknown as { rendezvous: unknown }).rendezvous = { store, clock, settings, views: { inertial, plot }, header };

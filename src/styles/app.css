@@ -510,13 +510,6 @@ kbd {
   gap: 16px;
 }
 
-.right-col {
-  display: grid;
-  grid-template-rows: minmax(0, 0.44fr) minmax(0, 0.56fr);
-  gap: 16px;
-  min-height: 0;
-}
-
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1352,11 +1345,12 @@ kbd {
 /* ---------- tablet 768–1199: 2 × 2 grid ---------- */
 
 .app[data-layout='tablet'] .views {
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1.3fr) minmax(0, 1fr);
 }
 
-.app[data-layout='tablet'] .right-col {
-  display: contents;
+/* tablet: the two views side by side on top, the burn editor across the bottom */
+.app[data-layout='tablet'] .views > .editor {
+  grid-column: 1 / -1;
 }
 
 .app[data-layout='tablet'] .drawer {
@@ -1368,13 +1362,8 @@ kbd {
 }
 
 .app[data-layout='tablet'] .burns-pane {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
   height: auto;
-}
-
-.app[data-layout='tablet'] .burn-list {
-  border-right: 0;
-  border-bottom: 1px solid var(--grid);
 }
 
 .app[data-layout='tablet'] .burn-row {
@@ -1509,10 +1498,6 @@ kbd {
   border-top: 1px solid var(--border);
 }
 
-.app[data-layout^='phone'] .right-col {
-  display: contents;
-}
-
 .app[data-layout^='phone'] .view-panel {
   flex: 1 1 0;
   border: 0;
@@ -1521,7 +1506,6 @@ kbd {
 }
 
 .app[data-layout='phone'][data-view='orbits'] .view-panel[data-view='orbits'],
-.app[data-layout='phone'][data-view='lvlh'] .view-panel[data-view='lvlh'],
 .app[data-layout='phone'][data-view='plot'] .view-panel[data-view='plot'] {
   display: flex;
 }
@@ -1925,33 +1909,40 @@ kbd {
 }
 
 /* phone: fewer title-row controls (they live in the axis popovers), plot stats instead of legend */
-.phone-stats {
-  display: none;
+.plot-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  font-family: var(--font-mono);
+  margin-right: 12px;
 }
 
 .app[data-layout^='phone'] .hide-phone,
 .app[data-layout^='phone'] .met-next,
-.app[data-layout^='phone'] .legend > .lg,
-.app[data-layout^='phone'] .legend > .spacer {
+.app[data-layout^='phone'] .legend > .lg {
   display: none;
 }
 
-.app[data-layout^='phone'] .phone-stats {
-  display: flex;
-  gap: 8px 28px;
-  flex-wrap: wrap;
-  font-family: var(--font-mono);
-}
-
 .stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: inline-flex;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .stat .tv {
-  font-size: 15px;
   color: var(--text);
+}
+
+.app[data-layout^='phone'] .plot-stats {
+  gap: 4px 16px;
+}
+
+.app[data-layout='tablet'] .hide-compact {
+  display: none;
+}
+
+.pop-seg {
+  align-self: flex-start;
 }
 
 .app[data-layout^='phone'] .telemetry-toggle {
@@ -1969,4 +1960,8 @@ kbd {
   background: var(--surface-2);
   padding: 10px 0 4px;
   margin-top: 8px;
+}
+
+.stat .tl:empty {
+  display: none;
 }

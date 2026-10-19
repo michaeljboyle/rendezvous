@@ -4,12 +4,12 @@ import { chaserElementsAt, relativeAt, sampleIndex, type Timeline } from '../phy
 import { dvMagnitude } from '../physics/burns';
 import type { AppCtx, View } from '../ui/context';
 import { closePopover, h, icon, menuAt, popover, setText } from '../ui/dom';
-import { countdown, dist, dv, met, metShort, num, tick as fmtTick } from '../ui/format';
+import { countdown, dist, distPair, dv, met, metShort, num, span as fmtSpan, speed, tick as fmtTick } from '../ui/format';
 import { panel } from '../ui/panel';
 import { coordsCheck, coordsChip } from '../ui/coords';
 import type { Coords } from '../state/viewSettings';
 import { Surface } from './canvas';
-import { DASH, drawBurnMarker, drawChaser, drawTarget, label, mono, niceStep, ticks } from './draw';
+import { DASH, arrow, drawBurnMarker, drawChaser, drawTarget, label, mono, niceStep, ticks } from './draw';
 import { attachGestures, type Pt } from './gestures';
 import { alpha, theme } from './theme';
 
@@ -18,6 +18,25 @@ export interface Range {
   vMax: number;
   rMin: number;
   rMax: number;
+}
+
+export type PlotMode = 'fit' | 'follow' | 'manual';
+const MODES: PlotMode[] = ['fit', 'follow', 'manual'];
+const MODE_LABEL: Record<PlotMode, string> = { fit: 'Fit', follow: 'Follow', manual: 'Manual' };
+const MODE_TITLE: Record<PlotMode, string> = {
+  fit: 'Whole scenario, refits after every burn edit (double-click)',
+  follow: 'Centred on the Target at equal scale, zooming with range (50 m to 500 km)',
+  manual: 'Your own ranges; they survive burn edits',
+};
+
+/** Follow-mode spans (half-extent of the shorter side), m. */
+export const FOLLOW_STEPS = [50, 200, 1000, 5000, 20000, 100000, 500000];
+const EASE_MS = 300;
+
+/** Next step up from the current range (with a little headroom so the Chaser stays inside). */
+export function followStep(range: number): number {
+  for (const s of FOLLOW_STEPS) if (s >= range * 1.08) return s;
+  return Math.pow(10, Math.ceil(Math.log10(range * 1.08)));
 }
 
 const MARGIN = 0.08;
@@ -79,11 +98,13 @@ interface Box {
 /** View 3 — the whole-scenario rendezvous plot in Target LVLH. */
 export class RendezvousPlot implements View {
   el: HTMLElement;
-  /** LVLH coordinates, shared with the LVLH-now view. */
+  /** LVLH coordinates (ViewSettings). */
   get coords(): Coords {
     return this.app.settings.coords;
   }
-  mode: 'auto' | 'manual' = 'auto';
+  /** Fit: whole scenario. Follow: Target-centred, equal scale, stepping with range. Manual: user ranges. */
+  mode: PlotMode = 'fit';
+  overlays = false;
   trueShape = false;
   lockAspect = false;
   private manual: Range = { vMin: -1, vMax: 1, rMin: -1, rMax: 1 };
@@ -94,6 +115,13 @@ export class RendezvousPlot implements View {
   private chip: HTMLButtonElement;
   private chipText = h('span');
   private hover: Pt | null = null;
+  private kosBtn: HTMLButtonElement;
+  // Follow-mode span (half-extent of the shorter side), eased between steps
+  private shown = 100000;
+  private easeFrom = 100000;
+  private easeTo = 100000;
+  private easeStart = -1e9;
+  private now = 0;
   private stats: Record<string, HTMLElement> = {};
   private burnHits: { x: number; y: number; index: number }[] = [];
   private nowPt: Pt = { x: -99, y: -99 };
@@ -104,15 +132,20 @@ export class RendezvousPlot implements View {
   private py1 = 0;
 
   constructor(private app: AppCtx) {
-    const p = panel('view-plot', 'Rendezvous plot', 'Target LVLH, whole scenario', 'Rendezvous plot');
+    const p = panel('view-plot', 'Rendezvous plot', 'Target-centered LVLH', 'Rendezvous plot');
     this.el = p.el;
     this.coordBtn = coordsChip(app);
-    this.segBtns = (['auto', 'manual'] as const).map((m) =>
-      h('button', { type: 'button', class: 'seg-btn', 'aria-pressed': String(m === this.mode), onclick: () => (m === 'auto' ? this.setAuto() : this.toManual()) }, m === 'auto' ? 'Auto' : 'Manual'),
+    this.segBtns = MODES.map((m) =>
+      h('button', { type: 'button', class: 'seg-btn', title: MODE_TITLE[m], 'aria-pressed': String(m === this.mode), onclick: () => this.setMode(m) }, MODE_LABEL[m]),
+    );
+    this.kosBtn = h(
+      'button',
+      { type: 'button', class: 'chip hide-phone hide-compact', 'aria-pressed': 'false', title: '200 m keep-out sphere and 4 × 2 km approach ellipsoid', onclick: () => this.setOverlays(!this.overlays) },
+      'KOS / AE',
     );
     const seg = h('div', { class: 'seg hide-phone', role: 'group', 'aria-label': 'Plot axis scaling' }, ...this.segBtns);
     this.chip = h('button', { type: 'button', class: 'chip chip-mono', 'aria-haspopup': 'dialog', 'aria-label': 'Axis ranges, opens axis settings', onclick: () => this.openPopover() }, this.chipText, icon('chevronDown', 12, 2));
-    p.controls.append(this.coordBtn, seg, this.chip);
+    p.controls.append(this.coordBtn, this.kosBtn, seg, this.chip);
 
     const legendLine = (dash: boolean) => {
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -131,14 +164,13 @@ export class RendezvousPlot implements View {
       return h('span', { class: 'stat' }, h('span', { class: 'tl' }, lab), v);
     };
     p.telemetry.append(
-      h('span', { class: 'phone-stats' }, stat('range', 'Range'), stat('rate', 'Range rate'), stat('next', 'Next burn')),
+      h('span', { class: 'plot-stats' }, stat('range', 'Range'), stat('rate', 'Rate'), stat('vr', ''), stat('next', 'Next burn')),
       h('span', { class: 'lg' }, legendLine(false), 'Past'),
       h('span', { class: 'lg' }, legendLine(true), 'Predicted'),
       h('span', { class: 'lg' }, h('span', { class: 'lg-tri', 'aria-hidden': 'true' }), 'Burn'),
       h('span', { class: 'lg' }, h('span', { class: 'lg-dot', 'aria-hidden': 'true' }), h('span', { class: 'lg-ticks' }, '10-min ticks')),
-      h('span', { class: 'spacer' }),
-      h('span', { class: 'lg-hint' }, 'Drag the dot to scrub · long-press to add a burn'),
     );
+    p.host.title = 'Drag the dot to scrub · tap a burn to edit it · long-press or right-click to add a burn';
 
     this.surface = new Surface(p.host, () => app.invalidate());
     attachGestures(this.surface.canvas, (e) => this.surface.local(e), {
@@ -168,7 +200,7 @@ export class RendezvousPlot implements View {
         const hit = this.nearest(pt);
         if (hit && hit.d < 12) app.clock.setTime(hit.t);
       },
-      onDoubleTap: () => this.setAuto(),
+      onDoubleTap: () => this.setMode('fit'),
       onLongPress: (pt, client) => {
         const hit = this.nearest(pt);
         if (!hit || hit.d > 40) return;
@@ -196,18 +228,26 @@ export class RendezvousPlot implements View {
     });
   }
 
-  setAuto(): void {
-    this.mode = 'auto';
-    this.segBtns.forEach((b, i) => b.setAttribute('aria-pressed', String(i === 0)));
+  setMode(m: PlotMode): void {
+    if (m === 'manual' && this.mode !== 'manual') this.manual = { ...this.cur };
+    if (m === 'follow' && this.mode !== 'follow') this.easeTo = -1; // start from the current view's span
+    this.mode = m;
+    this.segBtns.forEach((b, i) => b.setAttribute('aria-pressed', String(MODES[i] === m)));
     this.app.invalidate();
   }
 
-  private toManual(): void {
-    if (this.mode === 'manual') return;
-    this.manual = { ...this.cur };
-    this.mode = 'manual';
-    this.segBtns.forEach((b, i) => b.setAttribute('aria-pressed', String(i === 1)));
+  setOverlays(on: boolean): void {
+    this.overlays = on;
+    this.kosBtn.setAttribute('aria-pressed', String(on));
     this.app.invalidate();
+  }
+
+  animating(): boolean {
+    return this.mode === 'follow' && this.now - this.easeStart < EASE_MS + 20;
+  }
+
+  private toManual(): void {
+    if (this.mode !== 'manual') this.setMode('manual');
   }
 
   private panBy(dx: number, dy: number): void {
@@ -256,6 +296,11 @@ export class RendezvousPlot implements View {
     const rMax = mk(r.rMax, 'R-bar max');
     const lock = h('input', { type: 'checkbox', checked: this.lockAspect });
     const shape = h('input', { type: 'checkbox', checked: this.trueShape });
+    const kos = h('input', { type: 'checkbox', checked: this.overlays });
+    kos.addEventListener('change', () => this.setOverlays(kos.checked));
+    const modeBtns = MODES.map((m) =>
+      h('button', { type: 'button', class: 'seg-btn', 'aria-pressed': String(m === this.mode), onclick: () => (this.setMode(m), closePopover()) }, MODE_LABEL[m]),
+    );
     const apply = () => {
       const nr = { vMin: Number(vMin.value) * k, vMax: Number(vMax.value) * k, rMin: Number(rMin.value) * k, rMax: Number(rMax.value) * k };
       if (!Object.values(nr).every(Number.isFinite) || nr.vMax <= nr.vMin || nr.rMax <= nr.rMin) return;
@@ -276,16 +321,18 @@ export class RendezvousPlot implements View {
       'div',
       { class: 'axis-pop' },
       h('div', { class: 'pop-title' }, `Plot axes (${unit})`),
+      h('div', { class: 'seg pop-seg', role: 'group', 'aria-label': 'Plot axis scaling' }, ...modeBtns),
       h('div', { class: 'field-row' }, h('label', { class: 'field' }, h('span', null, 'V-bar min'), vMin), h('label', { class: 'field' }, h('span', null, 'V-bar max'), vMax)),
       h('div', { class: 'field-row' }, h('label', { class: 'field' }, h('span', null, 'R-bar min'), rMin), h('label', { class: 'field' }, h('span', null, 'R-bar max'), rMax)),
       coordsCheck(this.app),
+      h('label', { class: 'check' }, kos, h('span', null, 'Keep-out sphere (200 m) and approach ellipsoid (4 × 2 km)')),
       h('label', { class: 'check' }, lock, h('span', null, 'Lock aspect (zoom both axes together)')),
-      h('label', { class: 'check' }, shape, h('span', null, 'True shape in Auto (equal scale)')),
-      h('p', { class: 'hint' }, 'Wheel zooms both axes, Shift+wheel V-bar, Alt+wheel R-bar. Drag the tick labels to stretch one axis.'),
+      h('label', { class: 'check' }, shape, h('span', null, 'True shape in Fit (equal scale)')),
+      h('p', { class: 'hint' }, 'Fit shows the whole scenario; Follow centres on the Target at equal scale and zooms with range. Wheel zooms both axes, Shift+wheel V-bar, Alt+wheel R-bar; drag the tick labels to stretch one axis. Double-click returns to Fit.'),
       h(
         'div',
         { class: 'pop-actions' },
-        h('button', { type: 'button', class: 'btn', onclick: () => (this.setAuto(), closePopover()) }, 'Reset to Auto'),
+        h('button', { type: 'button', class: 'btn', onclick: () => (this.setMode('fit'), closePopover()) }, 'Reset to Fit'),
         h('button', { type: 'button', class: 'btn btn-primary', onclick: () => (apply(), closePopover()) }, 'Apply'),
       ),
     );
@@ -333,7 +380,8 @@ export class RendezvousPlot implements View {
     return null;
   }
 
-  render(t: number): void {
+  render(t: number, now = performance.now()): void {
+    this.now = now;
     const S = this.surface;
     const { store } = this.app;
     const tl = store.timeline;
@@ -345,10 +393,25 @@ export class RendezvousPlot implements View {
     const pw = Math.max(1, this.px1 - this.px0);
     const ph = Math.max(1, this.py1 - this.py0);
 
-    if (this.mode === 'auto') {
+    const rel = relativeAt(tl, t);
+    const pos = this.coords === 'curv' ? rel.curv : rel.rect;
+    if (this.mode === 'fit') {
       let r = fitRange(V, R, tl.count);
       if (this.trueShape) r = equalize(r, pw, ph);
       this.cur = r;
+    } else if (this.mode === 'follow') {
+      const step = followStep(Math.max(rel.range, Math.hypot(pos.v, pos.r)));
+      if (step !== this.easeTo) {
+        // Entering Follow eases from the current view; later steps ease from the shown span.
+        this.easeFrom = this.easeTo < 0 ? Math.max(1, Math.min(this.cur.vMax - this.cur.vMin, this.cur.rMax - this.cur.rMin) / 2) : this.shown;
+        this.easeTo = step;
+        this.easeStart = now;
+      }
+      const p = Math.min(1, (now - this.easeStart) / EASE_MS);
+      const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      this.shown = Math.exp(Math.log(this.easeFrom) + (Math.log(this.easeTo) - Math.log(this.easeFrom)) * e);
+      const k = Math.min(pw, ph) / 2 / this.shown; // px per m, equal on both axes
+      this.cur = { vMin: -pw / 2 / k, vMax: pw / 2 / k, rMin: -ph / 2 / k, rMax: ph / 2 / k };
     } else {
       this.cur = { ...this.manual };
     }
@@ -357,9 +420,15 @@ export class RendezvousPlot implements View {
     const ratio = sy / sx;
     const stretched = Math.abs(Math.log(ratio)) > Math.log(1.05);
     const desc = !stretched ? `${dist(this.cur.vMax - this.cur.vMin)}` : ratio > 1 ? `R-bar ×${num(ratio, ratio >= 10 ? 0 : 1)}` : `V-bar ×${num(1 / ratio, 1 / ratio >= 10 ? 0 : 1)}`;
-    setText(this.chipText, `${this.mode === 'auto' ? 'Auto' : 'Manual'} · ${desc}`);
+    setText(this.chipText, this.mode === 'follow' ? `Follow · ${fmtSpan(this.easeTo)}` : `${MODE_LABEL[this.mode]} · ${desc}`);
     this.chip.classList.toggle('chip-warn', stretched);
     this.chip.title = stretched ? 'Axes use different scales: the shape is stretched' : 'Equal scale on both axes';
+    setText(this.stats.range, dist(rel.range));
+    setText(this.stats.rate, dv(rel.rangeRate, true));
+    const [vs, rs, u] = distPair(pos.v, pos.r);
+    setText(this.stats.vr, `V ${vs}  R ${rs} ${u}`);
+    const nb = this.app.clock.nextBurnTime(t);
+    setText(this.stats.next, nb === null ? '—' : countdown(nb - t));
     if (!S.visible) return;
 
     const th = theme();
@@ -481,6 +550,29 @@ export class RendezvousPlot implements View {
       label(c, text, this.px1 - 6, y - 3, th.chaser);
     }
 
+    // Keep-out sphere (200 m) and approach ellipsoid (±2 km V-bar, ±1 km R-bar), drawn in the plot's scale
+    if (this.overlays) {
+      const ox = this.X(0);
+      const oy = this.Y(0);
+      c.save();
+      c.setLineDash([4, 4]);
+      c.lineWidth = 1;
+      c.strokeStyle = alpha(th.text, 0.45);
+      c.beginPath();
+      c.ellipse(ox, oy, 2000 * sx, 1000 * sy, 0, 0, Math.PI * 2);
+      c.stroke();
+      c.strokeStyle = alpha(th.burn, 0.7);
+      c.beginPath();
+      c.ellipse(ox, oy, 200 * sx, 200 * sy, 0, 0, Math.PI * 2);
+      c.stroke();
+      c.restore();
+      mono(c, 10.5);
+      c.textAlign = 'left';
+      c.textBaseline = 'bottom';
+      if (2000 * sx > 30 && 1000 * sy > 14) label(c, 'AE 4×2 km', ox - 2000 * sx * 0.7, oy - 1000 * sy * 0.72, th.textDim);
+      if (200 * sx > 14 && 200 * sy > 10) label(c, 'KOS 200 m', ox + 200 * sx * 0.72, oy - 200 * sy * 0.72, th.burn);
+    }
+
     // What-if ghost: the previous future trajectory, faint
     const ghost = store.ghost;
     if (ghost) {
@@ -499,13 +591,8 @@ export class RendezvousPlot implements View {
     }
 
     // Trajectory: past solid, future dashed, split exactly at "now"
-    const rel = relativeAt(tl, t);
-    setText(this.stats.range, dist(rel.range));
-    setText(this.stats.rate, dv(rel.rangeRate, true));
-    const nb = this.app.clock.nextBurnTime(t);
-    setText(this.stats.next, nb === null ? '—' : countdown(nb - t));
-    const nowV = this.coords === 'curv' ? rel.curv.v : rel.rect.v;
-    const nowR = this.coords === 'curv' ? rel.curv.r : rel.rect.r;
+    const nowV = pos.v;
+    const nowR = pos.r;
     const nx = this.X(nowV);
     const ny = this.Y(nowR);
     this.nowPt = { x: nx, y: ny };
@@ -563,13 +650,43 @@ export class RendezvousPlot implements View {
       this.burnHits.push({ x, y, index: b.index });
       burnLabels.push([x, y, `${store.numbers[b.index]} ${store.scenario.burns[b.index].name}`, b.tig <= t]);
     }
-    // "Now" label box is reserved before tick labels so they never overlap it.
+    // Relative-velocity arrow: displacement over 1/12 orbit, mapped through the plot's axes so it
+    // follows the trajectory's slope even when the axes are stretched; clamped to stay readable.
+    const speedMag = Math.hypot(pos.vv, pos.vr);
+    const tau = tl.targetPeriod / 12;
+    let ax = this.X(nowV + pos.vv * tau) - nx;
+    let ay = this.Y(nowR + pos.vr * tau) - ny;
+    const alen = Math.hypot(ax, ay);
+    const maxLen = Math.min(pw, ph) * 0.3;
+    if (alen > 0) {
+      const f = Math.max(14, Math.min(maxLen, alen)) / alen;
+      ax *= f;
+      ay *= f;
+    }
+    const showArrow = speedMag > 1e-4 && alen > 0;
+    // "Now" label box is reserved before tick labels so they never overlap it; it sits opposite the arrow.
     mono(c, 12);
     const nowText = `Now · ${metShort(t)}`;
     const nw = c.measureText(nowText).width;
-    const nowRight = nx + 14 + nw < this.px1 - 4;
-    const nowBox = nowRight ? { x0: nx + 12, y0: ny - 9, x1: nx + 14 + nw, y1: ny + 9 } : { x0: nx - 14 - nw, y0: ny - 9, x1: nx - 12, y1: ny + 9 };
-    placed.push(nowBox);
+    // Mostly-horizontal motion: put the label above the dot so it doesn't sit on the line.
+    const flat = showArrow && Math.abs(ay) < 0.35 * Math.abs(ax);
+    const prefersRight = !showArrow || ax <= 0;
+    const nowRight = prefersRight ? nx + 14 + nw < this.px1 - 4 : nx - 14 - nw < this.px0 + 4;
+    const nowY = flat ? ny - 16 : ny;
+    const nowX = flat ? Math.max(this.px0 + 2, Math.min(this.px1 - nw - 2, nx - nw / 2)) : nowRight ? nx + 12 : nx - 12 - nw;
+    placed.push({ x0: nowX - 2, y0: nowY - 9, x1: nowX + nw + 2, y1: nowY + 9 });
+    // Speed readout beyond the arrow tip, kept inside the plot and reserved so labels avoid it.
+    let speedPos: { x: number; y: number; text: string } | null = null;
+    if (showArrow) {
+      const text = speed(speedMag);
+      const sw = c.measureText(text).width;
+      const len = Math.hypot(ax, ay);
+      let sx0 = nx + ax + (ax / len) * 8 - (ax < 0 ? sw : 0);
+      const sy = ny + ay + (ay / len) * 8 + (Math.abs(ay / len) < 0.3 ? -10 : 0);
+      sx0 = Math.max(this.px0 + 2, Math.min(this.px1 - sw - 2, sx0));
+      speedPos = { x: sx0, y: sy, text };
+      placed.push({ x0: sx0 - 2, y0: sy - 9, x1: sx0 + sw + 2, y1: sy + 9 });
+    }
     // Burn labels: first free spot around the marker; if crowded, just the number; else nothing.
     const burnLabelPos: ({ x: number; y: number; text: string } | null)[] = [];
     for (const [x, y, text] of burnLabels) {
@@ -653,12 +770,17 @@ export class RendezvousPlot implements View {
       this.endLabel(c, V[ei], R[ei], 'End: ', th.chaser, placed);
     }
 
-    // Now dot + label
+    // Velocity arrow + readout, then the Now dot over it
+    if (showArrow) arrow(c, nx, ny, nx + ax, ny + ay, th.chaser, 1.6, 7);
+    mono(c, 12);
+    c.textAlign = 'left';
+    c.textBaseline = 'middle';
+    if (speedPos) label(c, speedPos.text, speedPos.x, speedPos.y, th.text);
     drawChaser(c, nx, ny, 6);
     mono(c, 12);
-    c.textAlign = nowRight ? 'left' : 'right';
+    c.textAlign = 'left';
     c.textBaseline = 'middle';
-    label(c, nowText, nowRight ? nx + 12 : nx - 12, ny, th.text);
+    label(c, nowText, nowX, nowY, th.text);
 
     c.restore();
 
