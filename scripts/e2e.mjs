@@ -67,7 +67,7 @@ const nextFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimat
     await page.keyboard.press('ArrowRight');
     assert.equal(await R(page, () => window.rendezvous.clock.t), 2700);
     await page.keyboard.press('ArrowRight');
-    assert.equal(await R(page, () => window.rendezvous.clock.t), 5468);
+    assert.equal(await R(page, () => window.rendezvous.clock.t), 5467.6);
     await page.keyboard.press('ArrowLeft');
     assert.equal(await R(page, () => window.rendezvous.clock.t), 2700);
   });
@@ -256,6 +256,33 @@ const nextFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimat
     assert.match(await page.locator('#view-plot .plot-stats').innerText(), /V −29\.19\s+R −42\.14 km/); // CLAUDE.md cross-check
     await page.locator('#view-plot .chip', { hasText: 'Rectilinear' }).click();
     assert.equal(await R(page, () => window.rendezvous.settings.coords), 'curv');
+  });
+
+  await check('Orbits panel: the Target label keeps its side while playing in Follow mode (no flicker)', async () => {
+    const sides = await page.evaluate(
+      () =>
+        new Promise((res) => {
+          const r = window.rendezvous;
+          const v = r.views.inertial;
+          v.camera = 'follow';
+          r.clock.setSpeed(600);
+          r.clock.play();
+          const seen = [];
+          const t0 = performance.now();
+          const tick = () => {
+            seen.push(v.alignState.get('target'));
+            if (performance.now() - t0 < 1500) requestAnimationFrame(tick);
+            else {
+              r.clock.pause();
+              v.camera = 'fixed';
+              res(seen.slice(2));
+            }
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
+    const changes = sides.filter((x, i) => i > 0 && x !== sides[i - 1]).length;
+    assert.equal(changes, 0, `label switched sides ${changes} times: ${[...new Set(sides)].join(', ')}`);
   });
 
   await check('keyboard focus is visible (focus ring uses --accent)', async () => {

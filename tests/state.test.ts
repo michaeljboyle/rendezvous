@@ -17,7 +17,7 @@ describe('store', () => {
     expect(endDraft).not.toBeCloseTo(endBefore, 0);
     expect(st.ghost!.curvV[st.ghost!.count - 1]).toBeCloseTo(endBefore, 6);
     st.cancelEdit();
-    expect(st.scenario.burns[1].dv.s).toBe(19.84);
+    expect(st.scenario.burns[1].dv.s).toBe(presetById('phasing')!.scenario.burns[1].dv.s);
     expect(st.ghost).toBeNull();
     expect(st.edited).toBe(false);
   });
@@ -30,7 +30,7 @@ describe('store', () => {
     st.commitEdit();
     expect(st.edited).toBe(true);
     st.undo();
-    expect(st.scenario.burns[1].dv.s).toBe(19.84);
+    expect(st.scenario.burns[1].dv.s).toBe(presetById('phasing')!.scenario.burns[1].dv.s);
     expect(st.edited).toBe(false);
     st.redo();
     expect(st.scenario.burns[1].dv.s).toBe(18.9);
@@ -42,7 +42,7 @@ describe('store', () => {
     expect(st.editing!.isNew).toBe(true);
     expect(st.draft!.tigS).toBe(1000);
     st.commitEdit();
-    expect(st.scenario.burns.map((b) => b.tigS)).toEqual([1000, 2700, 5468]);
+    expect(st.scenario.burns.map((b) => b.tigS)).toEqual([1000, 2700, 5467.6]);
     expect(burnNumbers(st.scenario.burns)).toEqual([1, 2, 3]);
     st.undo();
     expect(st.scenario.burns).toHaveLength(2);

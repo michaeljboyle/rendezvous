@@ -4,7 +4,7 @@ These are choices made while building v1 where the spec was silent, ambiguous, o
 
 ## Physics and presets
 
-1. **Preset 1 initial phase is −4.1568°, not −4.16°.** The table rounds this value. With exactly −4.16° the Chaser ends 5.38 km behind instead of 5 km, and the T+01:05:00 cross-check misses by 0.37 km on V-bar. With −4.1568° it arrives at 5.000 km, and every cross-check value matches to the stated rounding: range 51.26 km, rate −74.96 m/s, altitude 377.9 km, Ap/Pe 420.0/350.0, phase −0.25°, V −29.19 km, R −42.14 km.
+1. **Preset 1 is an exact Hohmann transfer: initial phase −4.156846°, Δv 19.89072 / 19.83932 m/s, Circularize at T+5467.60 s.** The table's values round these: −4.16°, 19.89 / 19.84 m/s, T+01:31:08. The rounded Δvs leave a ±16 m residual ellipse (Ap/Pe 420.016/419.984 km). With exactly −4.16° the Chaser ends 5.38 km behind instead of 5 km, and the T+01:05:00 cross-check misses by 0.37 km on V-bar. The exact values end in a 420.000 km circular orbit, exactly 5.000 km behind. Every cross-check value matches to the stated rounding: range 51.26 km, rate −74.96 m/s, altitude 377.9 km, Ap/Pe 420.0/350.0, phase −0.25°, V −29.19 km, R −42.14 km. A test checks the orbit ends circular to within metres.
 2. **Preset 4 Δvs are refined by two-body shooting** (`src/physics/targeting.ts`), starting from the CW values. In exact two-body, the 3-decimal CW values miss the short legs: leg 4 lands 4 m off on a 40 m leg, against a 2% tolerance. The refined values differ by at most 0.4 mm/s and round to the table's values, except Leg 2 R (2.532 vs 2.531). All waypoints are hit to well under 1 m.
 3. **Preset 3 uses the table's values unchanged.** The hop test checks each hop's displacement against 4·Δv/n to 1%, and all three pass. Small arrival errors carry over from hop to hop, so the Chaser holds at −33 m rather than −30 m.
 4. **LVLH initial offsets are curvilinear** (V-bar = arc length, R-bar = altitude difference). Velocity is relative to the rotating frame and defaults to 0, which means "at rest in LVLH". With R-bar = 0 this is exactly co-circular, as presets 3 and 5 need. With R-bar ≠ 0 the Chaser is at rest in LVLH, as preset 4 needs. The Scenario setup tab labels the option "LVLH offset (at rest in LVLH)".
@@ -27,6 +27,7 @@ These are choices made while building v1 where the spec was silent, ambiguous, o
 11. The plot's **True shape** toggle (equal scale in Fit) lives in the axis popover, together with Lock aspect, the coordinates toggle and KOS/AE. With Lock aspect on, single-axis zooms (Shift- or Alt-wheel, axis-label drags, one-direction pinches) zoom both axes.
 12. Disabled and out-of-range burns are not drawn in the views because they never happen. They stay greyed or flagged red in the list.
 13. Tick and label collisions are resolved by trying alternative positions and dropping a label that still collides. A crowded burn falls back to its number only.
+13a. **Orbits panel drawing.** Labels placed along a radial direction use hysteretic left / centred / right alignment, so they can't flip sides from frame to frame (e.g. the Target label in Follow mode). Off-screen burns get no marker or label. Orbits, trails and the what-if path sample adaptively: only the on-screen part is subdivided to ~3 px chords, with trails using exact propagation, so curves stay smooth at any zoom.
 
 ## Playback and editing
 
