@@ -96,8 +96,13 @@ const viewTabs = h('nav', { class: 'view-tabs', role: 'tablist', 'aria-label': '
 const viewsEl = h('main', { class: 'views' }, inertial.el, plot.el);
 const drawer = h('div', { class: 'drawer' });
 const dock = h('div', { class: 'dock' });
-const sheetHandle = h('button', { type: 'button', class: 'sheet-handle', 'aria-label': 'Resize burn sheet' }, h('span', { class: 'grip' }));
-const sheet = h('div', { class: 'sheet', 'data-state': 'peek' }, sheetHandle);
+const sheetHandle = h(
+  'button',
+  { type: 'button', class: 'sheet-handle', 'aria-label': 'Burns sheet: tap or swipe up to open, swipe down to minimise', 'aria-expanded': 'false' },
+  h('span', { class: 'grip' }),
+  h('span', { class: 'sheet-chevron', 'aria-hidden': 'true' }, icon('chevronUp', 14, 2)),
+);
+const sheet = h('div', { class: 'sheet', 'data-state': 'mini' }, sheetHandle);
 root.append(topbar, scrubRow, viewTabs, viewsEl, drawer, dock, sheet);
 inertial.el.dataset.view = 'orbits';
 plot.el.dataset.view = 'plot';
@@ -144,45 +149,93 @@ for (const v of views) {
   });
 }
 
-// Bottom sheet (phone): peek / half / full, draggable handle.
-type SheetState = 'peek' | 'half' | 'full';
+// Bottom sheet (phone). States, smallest first: mini (a labelled bar, the default), peek (burn list),
+// half (editing), full. Swipe the header anywhere: a flick moves one state, a slow drag snaps to the
+// nearest. The resting state (mini or peek) is remembered per browser.
+type SheetState = 'mini' | 'peek' | 'half' | 'full';
+const SHEET_ORDER: SheetState[] = ['mini', 'peek', 'half', 'full'];
+const SHEET_KEY = 'rendezvous:sheet';
+let restState: SheetState = 'mini';
+try {
+  if (localStorage.getItem(SHEET_KEY) === 'peek') restState = 'peek';
+} catch {
+  /* storage unavailable: start minimised */
+}
+function sheetHeight(state: SheetState): number {
+  const H = window.innerHeight;
+  const cs = getComputedStyle(root);
+  const px = (name: string, fallback: number) => parseFloat(cs.getPropertyValue(name)) || fallback;
+  return state === 'mini' ? px('--sheet-mini', 60) : state === 'peek' ? px('--sheet-peek', 172) : state === 'half' ? H * 0.52 : H * 0.92;
+}
 function setSheet(state: SheetState): void {
   sheet.dataset.state = state;
+  root.dataset.sheet = state;
   sheet.style.height = '';
+  sheetHandle.setAttribute('aria-expanded', String(state !== 'mini'));
+  if (state === 'mini' || state === 'peek') {
+    restState = state;
+    try {
+      localStorage.setItem(SHEET_KEY, state);
+    } catch {
+      /* best effort */
+    }
+  }
   dirty = true;
 }
 editor.onEditChange = (editing) => {
   if (!root.dataset.layout?.startsWith('phone')) return;
-  setSheet(editing ? 'half' : 'peek');
+  setSheet(editing ? 'half' : restState);
 };
 {
-  let drag: { y: number; h: number; moved: boolean } | null = null;
-  sheetHandle.addEventListener('pointerdown', (e) => {
-    sheetHandle.setPointerCapture(e.pointerId);
-    drag = { y: e.clientY, h: sheet.getBoundingClientRect().height, moved: false };
+  let drag: { y: number; h: number; moved: boolean; lastY: number; lastT: number; vy: number } | null = null;
+  // Drag zones: the handle, the sheet's header row and the edit form's title row. Buttons and inputs
+  // inside them keep working; the burn list itself still scrolls normally.
+  const inZone = (el: HTMLElement) => !!el.closest('.sheet-handle, .sheet .editor-head, .sheet .form-title') && !el.closest('button:not(.sheet-handle), input, select, a');
+  sheet.addEventListener('pointerdown', (e) => {
+    if (!inZone(e.target as HTMLElement)) return;
+    sheet.setPointerCapture(e.pointerId);
+    const now = performance.now();
+    drag = { y: e.clientY, h: sheet.getBoundingClientRect().height, moved: false, lastY: e.clientY, lastT: now, vy: 0 };
   });
-  sheetHandle.addEventListener('pointermove', (e) => {
+  sheet.addEventListener('pointermove', (e) => {
     if (!drag) return;
     const dy = e.clientY - drag.y;
-    if (Math.abs(dy) > 4) drag.moved = true;
-    if (drag.moved) sheet.style.height = `${Math.max(64, Math.min(window.innerHeight * 0.92, drag.h - dy))}px`;
+    if (Math.abs(dy) > 6) drag.moved = true;
+    const now = performance.now();
+    if (now > drag.lastT) drag.vy = 0.7 * ((e.clientY - drag.lastY) / (now - drag.lastT)) + 0.3 * drag.vy;
+    drag.lastY = e.clientY;
+    drag.lastT = now;
+    if (drag.moved) sheet.style.height = `${Math.max(sheetHeight('mini'), Math.min(sheetHeight('full'), drag.h - dy))}px`;
   });
-  sheetHandle.addEventListener('pointerup', () => {
+  const end = (cancelled: boolean) => {
     if (!drag) return;
-    const H = window.innerHeight;
-    const hNow = sheet.getBoundingClientRect().height;
-    if (!drag.moved) {
-      const order: SheetState[] = ['peek', 'half', 'full'];
-      const cur = sheet.dataset.state as SheetState;
-      setSheet(order[(order.indexOf(cur) + 1) % order.length]);
-    } else setSheet(hNow > H * 0.7 ? 'full' : hNow > H * 0.32 ? 'half' : 'peek');
+    const d = drag;
     drag = null;
-  });
+    const cur = SHEET_ORDER.indexOf(sheet.dataset.state as SheetState);
+    if (cancelled) return setSheet(SHEET_ORDER[cur]);
+    if (!d.moved) {
+      // Tap: open a minimised sheet; otherwise step up, wrapping from full back to the resting state.
+      setSheet(cur === SHEET_ORDER.length - 1 ? restState : SHEET_ORDER[cur + 1]);
+      return;
+    }
+    const hNow = sheet.getBoundingClientRect().height;
+    if (Math.abs(d.vy) > 0.5) {
+      // Flick: move one state in the flick's direction from the state nearest where it was released.
+      const near = nearestState(hNow);
+      const i = SHEET_ORDER.indexOf(near);
+      const dir = d.vy < 0 ? 1 : -1; // up = bigger
+      const target = SHEET_ORDER[Math.max(0, Math.min(SHEET_ORDER.length - 1, (dir > 0 ? Math.max(i, cur) : Math.min(i, cur)) + dir))];
+      setSheet(target);
+    } else setSheet(nearestState(hNow));
+  };
+  const nearestState = (hNow: number): SheetState =>
+    SHEET_ORDER.reduce((best, st) => (Math.abs(sheetHeight(st) - hNow) < Math.abs(sheetHeight(best) - hNow) ? st : best), 'mini' as SheetState);
+  sheet.addEventListener('pointerup', () => end(false));
+  sheet.addEventListener('pointercancel', () => end(true));
   sheetHandle.addEventListener('keydown', (e) => {
-    const order: SheetState[] = ['peek', 'half', 'full'];
-    const i = order.indexOf(sheet.dataset.state as SheetState);
-    if (e.key === 'ArrowUp') setSheet(order[Math.min(2, i + 1)]);
-    else if (e.key === 'ArrowDown') setSheet(order[Math.max(0, i - 1)]);
+    const i = SHEET_ORDER.indexOf(sheet.dataset.state as SheetState);
+    if (e.key === 'ArrowUp') setSheet(SHEET_ORDER[Math.min(SHEET_ORDER.length - 1, i + 1)]);
+    else if (e.key === 'ArrowDown') setSheet(SHEET_ORDER[Math.max(0, i - 1)]);
     else return;
     e.preventDefault();
     e.stopPropagation();
@@ -210,7 +263,7 @@ function applyLayout(): void {
     dock.replaceChildren(playback.scrubber, h('div', { class: 'dock-controls' }, playback.speedCycle, playback.transport));
     sheet.replaceChildren(sheetHandle, editor.el);
     editor.setCollapsed(false);
-    setSheet(store.editing && next === 'phone' ? 'half' : 'peek');
+    setSheet(store.editing && next === 'phone' ? 'half' : restState);
   }
   dirty = true;
 }

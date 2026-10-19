@@ -24,6 +24,7 @@ const shots = [
   { name: 'desktop-900', vp: { width: 1440, height: 900 }, q: '?preset=phasing&t=3900' },
   { name: 'tablet', vp: { width: 1024, height: 768 }, q: '?preset=phasing&t=3900' },
   { name: 'phone-plot', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true },
+  { name: 'phone-sheet-peek', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true, sheet: 'peek' },
   { name: 'phone-orbits', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=orbits', mobile: true },
   { name: 'phone-editor', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true, edit: true },
   { name: 'phone-landscape', vp: { width: 844, height: 390 }, q: '?preset=phasing&t=3900', mobile: true },
@@ -57,6 +58,7 @@ for (const s of shots) {
     });
   }
   if (s.rect) await page.evaluate(() => window.rendezvous.settings.setCoords('rect'));
+  if (s.sheet) await page.evaluate((st) => localStorage.setItem('rendezvous:sheet', st), s.sheet).then(() => page.reload());
   if (s.orbitsZoom) {
     await page.evaluate((z) => {
       const v = window.rendezvous.views.inertial;

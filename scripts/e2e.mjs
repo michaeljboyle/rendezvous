@@ -338,18 +338,49 @@ const nextFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimat
     }
   });
 
-  await check('bottom sheet: tapping a burn opens the edit form at half height; Done returns to peek', async () => {
-    assert.equal(await page.locator('.sheet').getAttribute('data-state'), 'peek');
+  await check('bottom sheet starts minimised as a labelled bar, and touch targets in it are 44 px', async () => {
+    const sh = page.locator('.sheet');
+    assert.equal(await sh.getAttribute('data-state'), 'mini');
+    const box = await sh.boundingBox();
+    assert.ok(box.height <= 70, `minimised height ${box.height}`);
+    assert.ok(box.y + box.height <= 844 + 1 && box.y < 844 - 40, 'bar is on screen');
+    assert.match(await page.locator('.sheet .sheet-title').innerText(), /Burns\s+2 · 39\.73 m\/s/);
+    const add = await page.locator('.sheet .btn-add').boundingBox();
+    assert.ok(add.height >= 44, `+ Burn ${add.height}px`);
+  });
+
+  await check('bottom sheet: tap opens it; tapping a burn edits at half height; Done returns to where it was', async () => {
+    const sh = page.locator('.sheet');
+    await page.locator('.sheet-handle').tap();
+    assert.equal(await sh.getAttribute('data-state'), 'peek');
     await page.locator('.sheet .burn-row', { hasText: 'Circularize' }).tap();
     await page.waitForTimeout(250);
-    assert.equal(await page.locator('.sheet').getAttribute('data-state'), 'half');
+    assert.equal(await sh.getAttribute('data-state'), 'half');
     assert.ok(await page.locator('.sheet .form').isVisible());
     await page.locator('.sheet .btn-done').tap();
     await page.waitForTimeout(250);
-    assert.equal(await page.locator('.sheet').getAttribute('data-state'), 'peek');
+    assert.equal(await sh.getAttribute('data-state'), 'peek');
   });
 
-  await check('sheet handle cycles peek → half → full', async () => {
+  await check('bottom sheet: swipe the header down to minimise, up to open; the choice survives a reload', async () => {
+    const sh = page.locator('.sheet');
+    const swipe = async (from, dy) => {
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      for (let k = 1; k <= 4; k++) await page.mouse.move(from.x, from.y + (dy * k) / 4);
+      await page.mouse.up();
+      await page.waitForTimeout(250);
+    };
+    const title = await page.locator('.sheet .sheet-title').boundingBox();
+    await swipe({ x: title.x + 10, y: title.y + title.height / 2 }, 120); // flick down from peek
+    assert.equal(await sh.getAttribute('data-state'), 'mini');
+    await page.reload();
+    await page.waitForTimeout(300);
+    assert.equal(await page.locator('.sheet').getAttribute('data-state'), 'mini', 'remembered after reload');
+    const t2 = await page.locator('.sheet .sheet-title').boundingBox();
+    await swipe({ x: t2.x + 10, y: t2.y + t2.height / 2 }, -90); // flick up from mini
+    assert.equal(await page.locator('.sheet').getAttribute('data-state'), 'peek');
+    // Handle steps up to full, then wraps back to the resting state.
     await page.locator('.sheet-handle').tap();
     assert.equal(await page.locator('.sheet').getAttribute('data-state'), 'half');
     await page.locator('.sheet-handle').tap();

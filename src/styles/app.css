@@ -1411,8 +1411,14 @@ kbd {
 .app[data-layout^='phone'] {
   min-height: 0;
   overflow: hidden;
-  padding-bottom: var(--sheet-peek);
+  /* Space kept clear for the sheet when it rests minimised (default) or at peek; half/full overlay. */
+  padding-bottom: var(--sheet-mini);
+  --sheet-mini: 62px;
   --sheet-peek: 172px;
+}
+
+.app[data-layout^='phone'][data-sheet='peek'] {
+  padding-bottom: var(--sheet-peek);
 }
 
 .app[data-layout^='phone'] .topbar {
@@ -1661,6 +1667,39 @@ kbd {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.app[data-layout^='phone'] .sheet[data-state='mini'] {
+  height: calc(var(--sheet-mini) + env(safe-area-inset-bottom));
+}
+
+/* Minimised: just the labelled header bar ("Burns 2 · 39.73 m/s", ▴, + Burn) so it stays discoverable. */
+.sheet[data-state='mini'] .editor-body {
+  display: none;
+}
+
+.sheet[data-state='mini'] .sheet-handle {
+  height: 16px;
+}
+
+.sheet[data-state='mini'] .editor-head {
+  height: 44px;
+}
+
+.sheet-chevron {
+  display: none;
+  color: var(--text-dim);
+}
+
+.sheet[data-state='mini'] .sheet-chevron {
+  display: inline-flex;
+}
+
+/* Swipe zones: the handle, the header row and the edit form's title row. */
+.sheet .editor-head,
+.sheet .form-title {
+  touch-action: none;
+  cursor: grab;
+}
+
 .app[data-layout^='phone'] .sheet[data-state='half'] {
   height: 52vh;
   height: 52dvh;
@@ -1674,8 +1713,10 @@ kbd {
 .sheet-handle {
   flex: 0 0 auto;
   height: 24px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: transparent;
   border: 0;
   touch-action: none;
@@ -1838,7 +1879,7 @@ kbd {
 
 /* phone landscape: Orbits + Plot side by side, sheet collapsed */
 .app[data-layout='phone-landscape'] {
-  --sheet-peek: 76px;
+  --sheet-peek: 45vh;
 }
 
 .app[data-layout='phone-landscape'] .view-panel[data-view='orbits'],
@@ -1876,11 +1917,6 @@ kbd {
 .app[data-layout='phone-landscape'] .play-btn {
   width: 44px;
   height: 44px;
-}
-
-.app[data-layout='phone-landscape'] .sheet[data-state='peek'] .burn-list,
-.app[data-layout='phone-landscape'] .sheet[data-state='peek'] .editor-body {
-  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
