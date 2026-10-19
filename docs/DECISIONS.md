@@ -43,9 +43,16 @@ These are choices made while building v1 where the spec was silent, ambiguous, o
 ## Layout
 
 22. **Phone:** the plot's title row keeps only the scale chip. Curvilinear, Fit/Follow/Manual and KOS/AE move into the axis popover to fit 390 px, and any gesture still switches to Manual. On tablet only Curvilinear and KOS/AE move there. The telemetry row under each view collapses with a toggle.
+22a. **Phone bottom sheet** has four states: minimised (the default), peek, half and full.
+   - **Minimised:** a 60 px bar that stays labelled ("Burns 2 · 39.73 m/s", ▴, + Burn), so the burns sheet is never hidden.
+   - **Peek:** the burn list.
+   - **Half:** opens automatically while you edit a burn.
+   - **Full:** the whole sheet.
+
+   Swipe the header row, the handle or the edit form's title: a flick moves one state, a slow drag snaps to the nearest one, and the burn list still scrolls normally. Tapping the bar opens it. The resting state (minimised or peek) is remembered per browser. Editing returns to it on Done or Cancel. Landscape uses the same states, with peek at 45% of the height.
 23. **Phone swipe** between views starts at the canvas edges (24 px) or on the title and telemetry rows, because a drag inside a canvas pans it.
 24. Undo/redo buttons sit in the burn drawer header on desktop and tablet, and in the ⋮ menu on phone.
-25. Phone landscape (height < 500 px) shows Orbits + Plot side by side with the sheet collapsed to its header.
+25. Phone landscape (height < 500 px) shows Orbits + Plot side by side, with the sheet minimised by default.
 26. Fonts are bundled with `@fontsource`, so there is no third-party font request.
 
 ## Testing
