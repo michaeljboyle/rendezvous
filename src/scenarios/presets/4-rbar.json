@@ -1,0 +1,63 @@
+{
+  "name": "R-bar approach",
+  "description": "R-bar is not a natural hold point: staying on it takes a burn every leg.",
+  "target": {
+    "altitudeKm": 420
+  },
+  "chaser": {
+    "lvlh": {
+      "vbarM": 0,
+      "rbarM": -2000,
+      "vVbarMps": 0,
+      "vRbarMps": 0
+    }
+  },
+  "durationS": 5400,
+  "burns": [
+    {
+      "name": "Leg 1",
+      "tigS": 0,
+      "dv": {
+        "r": 3.01634,
+        "s": 2.3621
+      },
+      "enabled": true
+    },
+    {
+      "name": "Leg 2",
+      "tigS": 1200,
+      "dv": {
+        "r": 2.53159,
+        "s": 1.33977
+      },
+      "enabled": true
+    },
+    {
+      "name": "Leg 3",
+      "tigS": 2400,
+      "dv": {
+        "r": 0.80264,
+        "s": 0.56653
+      },
+      "enabled": true
+    },
+    {
+      "name": "Leg 4",
+      "tigS": 3600,
+      "dv": {
+        "r": 0.19732,
+        "s": 0.17608
+      },
+      "enabled": true
+    },
+    {
+      "name": "Stop",
+      "tigS": 4800,
+      "dv": {
+        "r": 0.03399,
+        "s": 0.01619
+      },
+      "enabled": true
+    }
+  ]
+}
