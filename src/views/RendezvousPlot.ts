@@ -1,4 +1,5 @@
 import { RE } from '../physics/constants';
+import { altitudeArcR } from '../physics/frames';
 import { chaserElementsAt, relativeAt, sampleIndex, type Timeline } from '../physics/timeline';
 import { dvMagnitude } from '../physics/burns';
 import type { AppCtx, View } from '../ui/context';
@@ -454,24 +455,35 @@ export class RendezvousPlot implements View {
     c.setLineDash([2, 4]);
     c.strokeStyle = alpha(th.chaser, 0.8);
     c.lineWidth = 1.2;
+    // Curvilinear: constant altitude is a horizontal line. Rectilinear: it is an arc about Earth's centre.
     const apPe: [number, string][] = [];
-    if (el.e < 1) apPe.push([el.ra - rt, `Ap ${num((el.ra - RE) / 1000, 1)} km`]);
-    apPe.push([el.rp - rt, `Pe ${num((el.rp - RE) / 1000, 1)} km`]);
-    for (const [r] of apPe) {
-      const y = this.Y(r);
-      if (y < this.py0 - 2 || y > this.py1 + 2) continue;
+    if (el.e < 1) apPe.push([el.ra, `Ap ${num((el.ra - RE) / 1000, 1)} km`]);
+    apPe.push([el.rp, `Pe ${num((el.rp - RE) / 1000, 1)} km`]);
+    const arcR = (radius: number, v: number) => (this.coords === 'curv' ? radius - rt : altitudeArcR(radius, rt, v));
+    for (const [radius] of apPe) {
       c.beginPath();
-      c.moveTo(this.px0, y);
-      c.lineTo(this.px1, y);
+      let started = false;
+      const N = this.coords === 'curv' ? 1 : 120;
+      for (let k = 0; k <= N; k++) {
+        const v = cur.vMax - ((cur.vMax - cur.vMin) * k) / N;
+        const y = this.Y(arcR(radius, v));
+        if (!Number.isFinite(y)) {
+          started = false;
+          continue;
+        }
+        if (started) c.lineTo(this.X(v), y);
+        else c.moveTo(this.X(v), y);
+        started = true;
+      }
       c.stroke();
     }
     c.setLineDash([]);
     mono(c, 11);
     c.textAlign = 'right';
     c.textBaseline = 'bottom';
-    for (const [r, text] of apPe) {
-      const y = this.Y(r);
-      if (y < this.py0 + 10 || y > this.py1 + 2) continue;
+    for (const [radius, text] of apPe) {
+      const y = this.Y(arcR(radius, cur.vMin));
+      if (!Number.isFinite(y) || y < this.py0 + 10 || y > this.py1 + 2) continue;
       const w = c.measureText(text).width;
       const box = { x0: this.px1 - 6 - w, y0: y - 16, x1: this.px1 - 6, y1: y - 2 };
       if (this.collides(box, placed)) continue;

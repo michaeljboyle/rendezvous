@@ -78,6 +78,16 @@ export function toCurvilinear(target: State, chaser: State, refV?: number): Lvlh
   };
 }
 
+/**
+ * Rectilinear R-bar of the constant-radius circle |r| = radius at along-track offset V, for a Target at
+ * radius rt (the branch near the Target). Straight lines of constant R are only constant-altitude in
+ * curvilinear coordinates; in rectilinear LVLH a constant altitude curves down away from the Target.
+ * NaN where the circle does not reach that V.
+ */
+export function altitudeArcR(radius: number, rt: number, v: number): number {
+  return v * v <= radius * radius ? Math.sqrt(radius * radius - v * v) - rt : NaN;
+}
+
 /** Rotate a local (R, S) vector of `s` into the inertial frame. */
 export function localToInertial(s: State, r: number, sComp: number): { x: number; y: number } {
   const ax = localAxes(s);

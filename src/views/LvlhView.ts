@@ -1,4 +1,5 @@
 import { RE } from '../physics/constants';
+import { altitudeArcR } from '../physics/frames';
 import { chaserElementsAt, relativeAt, sampleIndex } from '../physics/timeline';
 import type { AppCtx, View } from '../ui/context';
 import { closePopover, h, icon, popover, segmented, setText } from '../ui/dom';
@@ -267,7 +268,7 @@ export class LvlhView implements View {
     // Ap / Pe lines
     const el = chaserElementsAt(tl, t);
     const rt = tl.targetRadius;
-    this.apPeLines(c, el.e < 1 ? el.ra - rt : NaN, el.rp - rt, (el.e < 1 ? el.ra : NaN) - RE, el.rp - RE, Y, S.w);
+    this.apPeLines(c, el.e < 1 ? el.ra : NaN, el.rp, rt, X, Y, vMin, vMax);
 
     // Overlays: keep-out sphere and approach ellipsoid
     if (this.overlays) {
@@ -347,8 +348,14 @@ export class LvlhView implements View {
     label(c, fmtSpan(bar), bx + bar * s + 8, by, th.text);
   }
 
-  private apPeLines(c: CanvasRenderingContext2D, rAp: number, rPe: number, apAlt: number, peAlt: number, Y: (r: number) => number, w: number): void {
+  /**
+   * Chaser apoapsis / periapsis altitudes as dotted constant-altitude arcs. This view is rectilinear,
+   * so a constant altitude is a circle about Earth's centre, not a horizontal line; the Chaser always
+   * lies between its Ap and Pe arcs.
+   */
+  private apPeLines(c: CanvasRenderingContext2D, ra: number, rp: number, rt: number, X: (v: number) => number, Y: (r: number) => number, vMin: number, vMax: number): void {
     const th = theme();
+    const w = this.surface.w;
     c.save();
     c.setLineDash([2, 4]);
     c.strokeStyle = alpha(th.chaser, 0.8);
@@ -356,16 +363,29 @@ export class LvlhView implements View {
     mono(c, 11);
     c.textAlign = 'right';
     const lines: [number, string][] = [];
-    if (Number.isFinite(rAp)) lines.push([rAp, `Ap ${num(apAlt / 1000, 1)} km`]);
-    lines.push([rPe, `Pe ${num(peAlt / 1000, 1)} km`]);
-    const same = lines.length === 2 && Math.abs(Y(lines[0][0]) - Y(lines[1][0])) < 14;
+    if (Number.isFinite(ra)) lines.push([ra, `Ap ${num((ra - RE) / 1000, 1)} km`]);
+    lines.push([rp, `Pe ${num((rp - RE) / 1000, 1)} km`]);
+    // Labels sit at the right edge, which is the most negative V on screen (+V-bar points left).
+    const yAt = (r: number) => Y(altitudeArcR(r, rt, vMin));
+    const same = lines.length === 2 && Math.abs(yAt(lines[0][0]) - yAt(lines[1][0])) < 14;
+    const N = 96;
     lines.forEach(([r, text], i) => {
-      const y = Y(r);
-      if (y < -2 || y > this.surface.h + 2) return;
       c.beginPath();
-      c.moveTo(0, y);
-      c.lineTo(w, y);
+      let started = false;
+      for (let k = 0; k <= N; k++) {
+        const v = vMin + ((vMax - vMin) * k) / N;
+        const y = Y(altitudeArcR(r, rt, v));
+        if (!Number.isFinite(y)) {
+          started = false;
+          continue;
+        }
+        if (started) c.lineTo(X(v), y);
+        else c.moveTo(X(v), y);
+        started = true;
+      }
       c.stroke();
+      const y = yAt(r);
+      if (!Number.isFinite(y) || y < -2 || y > this.surface.h + 2) return;
       c.textBaseline = same ? (i === 0 ? 'bottom' : 'top') : 'bottom';
       label(c, text, w - 8, same && i === 1 ? y + 3 : y - 3, th.chaser);
     });
