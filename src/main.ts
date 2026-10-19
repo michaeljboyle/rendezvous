@@ -223,6 +223,7 @@ document.addEventListener('keydown', (e) => {
   const typing = el.closest('input, textarea, select, [contenteditable="true"]') && !(el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio' || el.type === 'range'));
   if (typing || e.metaKey || e.ctrlKey) return;
   if (el instanceof HTMLInputElement && el.type === 'range' && (e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End')) return;
+  if (e.key === ' ' && el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio')) return;
   switch (e.key) {
     case ' ':
       e.preventDefault();
