@@ -1,0 +1,46 @@
+{
+  "name": "Undock and depart",
+  "description": "A radial push makes a closed loop; a retrograde burn moves you ahead.",
+  "target": {
+    "altitudeKm": 420
+  },
+  "chaser": {
+    "lvlh": {
+      "vbarM": 0,
+      "rbarM": 0,
+      "vVbarMps": 0,
+      "vRbarMps": 0
+    }
+  },
+  "durationS": 16735,
+  "durationRevs": 3,
+  "burns": [
+    {
+      "name": "Undock",
+      "tigS": 0,
+      "dv": {
+        "r": -0.12,
+        "s": 0
+      },
+      "enabled": true
+    },
+    {
+      "name": "Sep 1",
+      "tigS": 600,
+      "dv": {
+        "r": 0,
+        "s": -0.5
+      },
+      "enabled": true
+    },
+    {
+      "name": "Sep 2",
+      "tigS": 3390,
+      "dv": {
+        "r": 0,
+        "s": -1.0
+      },
+      "enabled": true
+    }
+  ]
+}

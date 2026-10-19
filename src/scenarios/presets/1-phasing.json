@@ -1,0 +1,34 @@
+{
+  "name": "Phasing from below",
+  "description": "Lower orbit is faster: the Chaser catches up from 493 km behind, then a Hohmann transfer takes half an orbit to climb to the Target's altitude.",
+  "target": {
+    "altitudeKm": 420
+  },
+  "chaser": {
+    "circular": {
+      "altitudeKm": 350,
+      "phaseDeg": -4.15683
+    }
+  },
+  "durationS": 9000,
+  "burns": [
+    {
+      "name": "Transfer",
+      "tigS": 2700,
+      "dv": {
+        "r": 0,
+        "s": 19.89
+      },
+      "enabled": true
+    },
+    {
+      "name": "Circularize",
+      "tigS": 5468,
+      "dv": {
+        "r": 0,
+        "s": 19.84
+      },
+      "enabled": true
+    }
+  ]
+}

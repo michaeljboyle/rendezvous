@@ -1,0 +1,72 @@
+{
+  "name": "V-bar approach",
+  "description": "Radial hops move you along V-bar; each takes half an orbit.",
+  "target": {
+    "altitudeKm": 420
+  },
+  "chaser": {
+    "lvlh": {
+      "vbarM": -5000,
+      "rbarM": 0,
+      "vVbarMps": 0,
+      "vRbarMps": 0
+    }
+  },
+  "durationS": 9600,
+  "burns": [
+    {
+      "name": "Hop 1",
+      "tigS": 300,
+      "dv": {
+        "r": -1.126,
+        "s": 0
+      },
+      "enabled": true
+    },
+    {
+      "name": "Hop 1 stop",
+      "tigS": 3089,
+      "dv": {
+        "r": -1.126,
+        "s": 0
+      },
+      "enabled": true
+    },
+    {
+      "name": "Hop 2",
+      "tigS": 3300,
+      "dv": {
+        "r": -0.225,
+        "s": 0
+      },
+      "enabled": true
+    },
+    {
+      "name": "Hop 2 stop",
+      "tigS": 6089,
+      "dv": {
+        "r": -0.225,
+        "s": 0
+      },
+      "enabled": true
+    },
+    {
+      "name": "Hop 3",
+      "tigS": 6300,
+      "dv": {
+        "r": -0.048,
+        "s": 0
+      },
+      "enabled": true
+    },
+    {
+      "name": "Hop 3 stop",
+      "tigS": 9089,
+      "dv": {
+        "r": -0.048,
+        "s": 0
+      },
+      "enabled": true
+    }
+  ]
+}

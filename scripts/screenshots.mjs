@@ -1,0 +1,61 @@
+// Screenshot checks at the mockup viewports. Usage: npm run build && node scripts/screenshots.mjs
+// Serves dist/ with `vite preview` and writes PNGs to screenshots/.
+import { chromium } from 'playwright-core';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+
+const PORT = 4179;
+const exe = process.env.CHROMIUM_PATH || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium'].find((p) => fs.existsSync(p));
+const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+const base = `http://localhost:${PORT}/`;
+for (let i = 0; i < 50; i++) {
+  try {
+    await fetch(base);
+    break;
+  } catch {
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+fs.mkdirSync('screenshots', { recursive: true });
+const browser = await chromium.launch({ executablePath: exe });
+const shots = [
+  { name: 'desktop', vp: { width: 1440, height: 1000 }, q: '?preset=phasing&t=3900' },
+  { name: 'desktop-900', vp: { width: 1440, height: 900 }, q: '?preset=phasing&t=3900' },
+  { name: 'tablet', vp: { width: 1024, height: 768 }, q: '?preset=phasing&t=3900' },
+  { name: 'phone-plot', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true },
+  { name: 'phone-orbits', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=orbits', mobile: true },
+  { name: 'phone-lvlh', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=lvlh', mobile: true },
+  { name: 'phone-editor', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true, edit: true },
+  { name: 'phone-landscape', vp: { width: 844, height: 390 }, q: '?preset=phasing&t=3900', mobile: true },
+  { name: 'desktop-vbar', vp: { width: 1440, height: 1000 }, q: '?preset=vbar&t=4000' },
+  { name: 'desktop-rbar', vp: { width: 1440, height: 1000 }, q: '?preset=rbar&t=2000' },
+  { name: 'desktop-undock', vp: { width: 1440, height: 1000 }, q: '?preset=undock&t=7000' },
+];
+const only = process.argv[2];
+const errors = [];
+for (const s of shots) {
+  if (only && !s.name.includes(only)) continue;
+  const ctx = await browser.newContext({ viewport: s.vp, deviceScaleFactor: 2, isMobile: !!s.mobile, hasTouch: !!s.mobile });
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => errors.push(`${s.name}: ${e.message}`));
+  page.on('console', (m) => m.type() === 'error' && errors.push(`${s.name}: ${m.text()}`));
+  await page.goto(base + s.q);
+  await page.evaluate(() => document.fonts.ready);
+  if (s.edit) {
+    await page.evaluate(() => {
+      const r = window.rendezvous;
+      r.store.beginEdit(1);
+      r.store.updateDraft((b) => (b.dv.s = 18.8));
+    });
+  }
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `screenshots/${s.name}.png` });
+  await ctx.close();
+}
+await browser.close();
+server.kill();
+if (errors.length) {
+  console.error(errors.join('\n'));
+  process.exit(1);
+}
+console.log('screenshots written to screenshots/');
