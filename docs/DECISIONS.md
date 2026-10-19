@@ -1,0 +1,46 @@
+# Build decisions
+
+These are choices made while building v1 where the spec was silent, ambiguous, or in conflict with itself or the mockups. Where the spec and a mockup disagreed, the spec won.
+
+## Physics and presets
+
+1. **Preset 1 initial phase is −4.1568°, not −4.16°.** The table rounds this value. With exactly −4.16° the Chaser ends 5.38 km behind instead of 5 km, and the T+01:05:00 cross-check misses by 0.37 km on V-bar. With −4.1568° it arrives at 5.000 km, and every cross-check value matches to the stated rounding: range 51.26 km, rate −74.96 m/s, altitude 377.9 km, Ap/Pe 420.0/350.0, phase −0.25°, V −29.19 km, R −42.14 km.
+2. **Preset 4 Δvs are refined by two-body shooting** (`src/physics/targeting.ts`), starting from the CW values. In exact two-body, the 3-decimal CW values miss the short legs: leg 4 lands 4 m off on a 40 m leg, against a 2% tolerance. The refined values differ by at most 0.4 mm/s and round to the table's values, except Leg 2 R (2.532 vs 2.531). All waypoints are hit to well under 1 m.
+3. **Preset 3 uses the table's values unchanged.** The hop test checks each hop's displacement against 4·Δv/n to 1%, and all three pass. Small arrival errors carry over from hop to hop, so the Chaser holds at −33 m rather than −30 m.
+4. **LVLH initial offsets are curvilinear** (V-bar = arc length, R-bar = altitude difference). Velocity is relative to the rotating frame and defaults to 0, which means "at rest in LVLH". With R-bar = 0 this is exactly co-circular, as presets 3 and 5 need. With R-bar ≠ 0 the Chaser is at rest in LVLH, as preset 4 needs. The Scenario setup tab labels the option "LVLH offset (at rest in LVLH)".
+5. **Schema additions:** optional `durationRevs` (presets 2 and 5 last 3 revolutions), `chaser.circular {altitudeKm, phaseDeg}` as an alternative to `chaser.lvlh`, and `description`.
+6. The Target starts at the top of the fixed inertial view and orbits counter-clockwise.
+7. Propagation uses universal variables, so escape trajectories from very large burns still propagate and draw.
+
+## Views
+
+8. **The View 2 velocity arrow shows the relative-velocity magnitude in LVLH** (84.6 m/s at T+01:05), as the spec describes. The mockup's label shows 75.0 m/s, which is the range rate. Arrow length is speed × (orbit period / 12), clamped so it stays visible.
+9. **View 2 Auto scale:** it picks the smallest step that is at least 1.08 × range. The span is the half-extent of the shorter canvas side. The chip reads "Auto · 100 km" as the spec says; the mockup shows only "100 km".
+10. Clicking the altitude-exaggeration chip cycles through 1× → 10× → 30× → 100×. Follow Target mode zooms in 3.5× around the Target. Wheel, pinch and drag zoom and pan in both camera modes, and double-click fits.
+11. The View 3 **True shape** toggle lives in the axis popover, together with Lock aspect and the coordinates toggle. With Lock aspect on, single-axis zooms (Shift- or Alt-wheel, axis-label drags, one-direction pinches) zoom both axes.
+12. Disabled and out-of-range burns are not drawn in the views because they never happen. They stay greyed or flagged red in the list.
+13. Tick and label collisions are resolved by trying alternative positions and dropping a label that still collides. A crowded burn falls back to its number only.
+
+## Playback and editing
+
+14. **Space is a global play/pause.** Focused buttons still activate with Enter. Arrow keys inside the scrubber move time by ±60 s (±10 min with Shift) instead of jumping between burns.
+15. Previous/next burn jumps to the exact TIG, where the state shown is just after the burn. "Slow near burns" sub-steps each frame, so 600× can never skip the ±60 s window.
+16. **One edit session is one undo step:** everything from opening a burn to Done. Pressing Z during an edit cancels it. Toggle, duplicate, delete, setup changes and loading a preset are each one undo step.
+17. The burn array is re-sorted by TIG when each edit is committed. Burn numbers are ranks by TIG, and ties are applied in list order.
+18. Tapping a burn marker or list row opens that burn in the editor, so selecting and editing are the same action.
+19. The share link is read once on load and then cleared from the address bar, so later edits autosave to localStorage. Autosave stores the committed scenario, never a half-finished edit.
+20. A deep-link query (`?preset=`, `&t=`, `&view=`) was added for demos and automated checks.
+21. Δv values show 2 decimals, or 3 below 0.1 m/s, so preset 3's 0.048 m/s hop stays visible.
+
+## Layout
+
+22. **Phone:** the plot and LVLH title rows keep only the scale chip. Curvilinear, Auto/Manual and KOS/AE move into the axis popovers to fit 390 px, and any gesture still switches to Manual. Under the plot, the telemetry row shows Range / Range rate / Next burn as in the mockup, and a toggle collapses it.
+23. **Phone swipe** between views starts at the canvas edges (24 px) or on the title and telemetry rows, because a drag inside a canvas pans it.
+24. Undo/redo buttons sit in the burn drawer header on desktop and tablet, and in the ⋮ menu on phone.
+25. Phone landscape (height < 500 px) shows Orbits + Plot side by side with the sheet collapsed to its header.
+26. Fonts are bundled with `@fontsource`, so there is no third-party font request.
+
+## Testing
+
+27. Browser checks use `playwright-core` scripts (`scripts/e2e.mjs`, `scripts/screenshots.mjs`) against the built app, not the `@playwright/test` runner. CI runs Vitest and the build; the browser scripts need a Chromium binary and are run locally.
+28. Verified in Chromium at 1440 × 900/1000, 1024 × 768, 390 × 844 and 844 × 390, including 60 fps at 600× under 4× CPU throttling. Safari, Firefox and real iPhone/Android devices have not been tested yet.
