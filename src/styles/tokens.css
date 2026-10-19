@@ -1,0 +1,27 @@
+/* Design tokens from docs/prompt.md "Visual design". */
+:root {
+  --bg: #0b0f14;
+  --surface: #121820;
+  --surface-2: #1a2230;
+  --border: #243042;
+  --grid: #1c2633;
+  --axis: #3a4a5f;
+  --text: #e6edf3;
+  --text-dim: #8b98a9;
+  --target: #4fc3f7;
+  --chaser: #ffb74d;
+  --burn: #ff5c7a;
+  --earth: #16324f;
+  --earth-limb: #2b5a86;
+  --accent: #7c9cff;
+  --accent-hover: #a9bcff;
+  --warn: #ffb74d;
+
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --fs-12: 12px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --radius: 8px;
+  --radius-sm: 6px;
+}
