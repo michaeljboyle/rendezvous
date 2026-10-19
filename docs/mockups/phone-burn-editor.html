@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rendezvous Simulator — Phone, editing a burn</title>
+<!-- Static mockup: Phone, 390 × 844 — editing a burn (what-if). Visual reference only. docs/prompt.md (the spec) wins on any conflict. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0B0F14}
+a{color:#7C9CFF}a:hover{color:#A9BCFF}
+button,input{font-family:inherit}
+input[type=range]{accent-color:#7C9CFF}
+</style>
+</head>
+<body>
+<div style="width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; position: relative; background: #0B0F14; color: #E6EDF3; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; display: flex; flex-direction: column">
+
+  <header style="height: 52px; flex: 0 0 auto; box-sizing: border-box; padding: 0 12px 0 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #243042; background: #121820">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9CFF" stroke-width="1.6" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="5.5" transform="rotate(-25 12 12)"></ellipse><circle cx="12" cy="12" r="2.4" fill="#7C9CFF" stroke="none"></circle></svg>
+    <button type="button" style="height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 6px; background: transparent; color: #E6EDF3; border: 0; font-size: 14px; font-weight: 600">1 · Phasing<span style="font-size: 11px; font-weight: 400; color: #FFB74D">edited</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8B98A9" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+    <span style="flex: 1 1 auto"></span>
+    <div style="display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 500">T+01:05:00</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #8B98A9">Paused</span>
+    </div>
+  </header>
+
+  <div role="tablist" aria-label="View" style="flex: 0 0 auto; margin: 8px 16px; height: 40px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 3px; box-sizing: border-box; background: #121820; border: 1px solid #243042; border-radius: 8px">
+    <button type="button" role="tab" aria-selected="false" style="background: transparent; color: #8B98A9; border: 0; border-radius: 6px; font-size: 13px">Orbits</button>
+    <button type="button" role="tab" aria-selected="false" style="background: transparent; color: #8B98A9; border: 0; border-radius: 6px; font-size: 13px">LVLH</button>
+    <button type="button" role="tab" aria-selected="true" style="background: #243042; color: #E6EDF3; border: 0; border-radius: 6px; font-size: 13px; font-weight: 600">Plot</button>
+  </div>
+
+  <section aria-label="Rendezvous plot, zoomed" style="flex: 0 0 auto; background: #121820; border-top: 1px solid #243042">
+    <div style="height: 40px; box-sizing: border-box; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 8px">
+      <h2 style="margin: 0; font-size: 13px; font-weight: 600">Rendezvous plot</h2>
+      <span style="flex: 1 1 auto"></span>
+      <span style="height: 26px; display: inline-flex; align-items: center; padding: 0 9px; background: #1A2230; color: #E6EDF3; border: 1px solid #7C9CFF; border-radius: 13px; font-size: 11.5px">What-if</span>
+      <button type="button" style="height: 28px; padding: 0 9px; background: #1A2230; color: #E6EDF3; border: 1px solid #3A4A5F; border-radius: 14px; font-family: 'IBM Plex Mono', monospace; font-size: 11px">Zoom · 60 km</button>
+    </div>
+    <svg width="390" height="250" viewBox="0 0 390 250" role="img" aria-label="What-if: with the smaller circularize burn the Chaser no longer holds 5 km behind; it drifts past the Target and ends 8.6 km ahead and 3.1 km below" style="display: block" font-family="IBM Plex Mono, monospace">
+      <g stroke="#1C2633" stroke-width="1">
+        <line x1="26.6" y1="12" x2="26.6" y2="224"></line><line x1="133.1" y1="12" x2="133.1" y2="224"></line><line x1="186.3" y1="12" x2="186.3" y2="224"></line><line x1="239.5" y1="12" x2="239.5" y2="224"></line><line x1="292.8" y1="12" x2="292.8" y2="224"></line><line x1="346.0" y1="12" x2="346.0" y2="224"></line>
+        <line x1="16" y1="77.2" x2="346" y2="77.2"></line><line x1="16" y1="118.0" x2="346" y2="118.0"></line><line x1="16" y1="158.8" x2="346" y2="158.8"></line><line x1="16" y1="199.5" x2="346" y2="199.5"></line>
+      </g>
+      <line x1="16" y1="36.5" x2="346" y2="36.5" stroke="#3A4A5F" stroke-width="1.25"></line>
+      <line x1="79.9" y1="12" x2="79.9" y2="224" stroke="#3A4A5F" stroke-width="1.25"></line>
+      <line x1="16" y1="36.5" x2="346" y2="36.5" stroke="#FFB74D" stroke-opacity="0.8" stroke-width="1.25" stroke-dasharray="2 4"></line>
+      <text x="344" y="31" text-anchor="end" font-size="10.5" fill="#FFB74D">Ap 420.0</text>
+      <text x="344" y="219" text-anchor="end" font-size="10.5" fill="#FFB74D">Pe 350.0 ↓</text>
+      <g font-size="10.5" fill="#8B98A9">
+        <text x="26.6" y="242" text-anchor="middle">+10</text><text x="79.9" y="242" text-anchor="middle">0</text><text x="133.1" y="242" text-anchor="middle">−10</text><text x="186.3" y="242" text-anchor="middle">−20</text><text x="239.5" y="242" text-anchor="middle">−30</text><text x="292.8" y="242" text-anchor="middle">−40</text><text x="346.0" y="242" text-anchor="middle">−50</text>
+        <text x="352" y="40">0</text><text x="352" y="80.7">−10</text><text x="352" y="121.5">−20</text><text x="352" y="162.3">−30</text><text x="352" y="203">−40</text><text x="352" y="222">km</text>
+      </g>
+      <path d="M445.0 269.0 L427.6 265.2 L410.6 261.3 L393.9 257.2 L377.6 253.1 L361.7 248.9 L346.1 244.6 L331.0 240.2 L316.2 235.8 L301.8 231.3 L287.9 226.7 L274.3 222.1 L261.2 217.5 L248.5 212.7 L236.2 208.0" fill="none" stroke="#FFB74D" stroke-width="2" stroke-linejoin="round"></path>
+      <circle cx="106.5" cy="36.5" r="9" fill="none" stroke="#E6EDF3" stroke-opacity="0.3" stroke-width="1.25" stroke-dasharray="3 3"></circle>
+      <path d="M236.2 208.0 L224.4 203.2 L212.9 198.4 L201.9 193.6 L191.4 188.7 L181.2 183.9 L171.5 179.0 L162.3 174.2 L153.5 169.3 L145.1 164.5 L137.1 159.7 L129.6 154.9 L122.5 150.1 L115.8 145.4 L109.5 140.7 L103.7 136.0 L98.2 131.4 L93.2 126.9 L88.6 122.4 L84.4 118.0 L80.5 113.6 L77.0 109.4 L74.0 105.2 L71.2 101.1 L68.9 97.1 L66.9 93.2 L65.2 89.3 L63.9 85.6 L62.9 82.0 L62.2 78.5 L61.8 75.2 L61.7 71.9 L61.8 68.8 L62.3 65.8 L63.0 62.9 L64.0 60.2 L65.2 57.6 L66.6 55.1 L68.2 52.8 L70.0 50.6 L72.1 48.6 L74.2 46.7 L76.6 45.0 L79.1 43.4 L81.7 42.0 L84.4 40.7 L87.3 39.7 L90.2 38.7 L93.2 37.9 L96.3 37.3 L99.4 36.9 L102.5 36.6 L105.7 36.5 L106.5 36.5 L106.8 36.5 L107.1 36.5 L107.5 36.6 L107.7 36.7 L108.0 36.9 L108.3 37.1 L108.5 37.3 L108.6 37.5 L108.7 37.8 L108.8 38.1 L108.8 38.4 L108.8 38.8 L108.7 39.2 L108.5 39.6 L108.2 40.0 L107.9 40.4 L107.5 40.9 L107.0 41.4 L106.4 41.9 L105.7 42.4 L105.0 42.8 L104.2 43.4 L103.2 43.9 L102.2 44.4 L101.1 44.9 L99.9 45.4 L98.6 45.9 L97.2 46.4 L95.8 46.8 L94.2 47.3 L92.6 47.8 L90.9 48.2 L89.1 48.6 L87.3 49.0 L85.4 49.4 L83.4 49.7 L81.4 50.0 L79.3 50.3 L77.2 50.6 L75.0 50.8 L72.8 51.0 L70.5 51.2 L68.2 51.3 L65.9 51.4 L63.6 51.5 L61.3 51.5 L59.0 51.5 L56.7 51.5 L54.3 51.4 L52.0 51.3 L49.8 51.2 L47.5 51.0 L45.3 50.8 L43.1 50.5 L41.0 50.3 L38.9 50.0 L36.9 49.7 L34.9 49.3" fill="none" stroke="#FFB74D" stroke-opacity="0.75" stroke-width="1.5" stroke-dasharray="5 4"></path>
+      <g fill="#8B98A9"><circle cx="137.1" cy="159.7" r="2"></circle><circle cx="61.8" cy="75.2" r="2"></circle></g>
+      <path d="M106.5 29.5 L112.5 40.5 L100.5 40.5 Z" fill="#121820" stroke="#FF5C7A" stroke-width="1.5"></path>
+      <text x="120" y="28" font-size="11" fill="#E6EDF3">2 Circularize</text>
+      <text x="120" y="56" font-size="10.5" fill="#8B98A9">was: hold 5 km behind</text>
+      <rect x="75.9" y="32.5" width="8" height="8" fill="#4FC3F7" stroke="#121820" stroke-width="1.5"></rect>
+      <circle cx="34.9" cy="49.3" r="3" fill="#FFB74D"></circle>
+      <text x="20" y="72" font-size="10.5" fill="#FFB74D">End: 8.6 km</text>
+      <text x="20" y="85" font-size="10.5" fill="#FFB74D">ahead</text>
+      <circle cx="236.2" cy="208.0" r="6" fill="#FFB74D" stroke="#121820" stroke-width="2.5"></circle>
+      <text x="246" y="200" font-size="11.5" fill="#E6EDF3">Now</text>
+    </svg>
+  </section>
+
+  <section aria-label="Edit burn 2" style="position: absolute; left: 0; right: 0; bottom: 0; height: 446px; box-sizing: border-box; padding: 6px 16px 16px; background: #1A2230; border-top: 1px solid #3A4A5F; border-radius: 14px 14px 0 0; display: flex; flex-direction: column; gap: 12px">
+    <div aria-hidden="true" style="width: 36px; height: 4px; margin: 0 auto; border-radius: 2px; background: #3A4A5F"></div>
+    <div style="display: flex; align-items: center; gap: 10px">
+      <span style="display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 4px; border: 1.5px solid #FF5C7A; box-sizing: border-box; color: #FF5C7A; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 500">2</span>
+      <h2 style="margin: 0; font-size: 16px; font-weight: 600">Edit burn</h2>
+      <span style="flex: 1 1 auto"></span>
+      <button type="button" aria-label="Delete burn" style="width: 44px; height: 44px; display: grid; place-items: center; background: transparent; border: 0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B98A9" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg></button>
+    </div>
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 10px">
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: #8B98A9">Name
+        <input type="text" value="Circularize" style="height: 44px; box-sizing: border-box; padding: 0 12px; background: #0B0F14; color: #E6EDF3; border: 1px solid #243042; border-radius: 8px; font-size: 15px">
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: #8B98A9">TIG
+        <input type="text" value="T+01:31:08" style="height: 44px; box-sizing: border-box; padding: 0 10px; background: #0B0F14; color: #E6EDF3; border: 1px solid #243042; border-radius: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 14px">
+      </label>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between">
+        <label for="m-r" style="font-size: 13px">Radial <span style="color: #8B98A9; font-size: 11.5px">+ up</span></label>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px">0.00 <span style="font-size: 11px; color: #8B98A9">m/s</span></span>
+      </div>
+      <input id="m-r" type="range" min="-2" max="2" step="0.01" value="0" style="width: 100%; height: 28px">
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between">
+        <label for="m-s" style="font-size: 13px">Along-track <span style="color: #8B98A9; font-size: 11.5px">+ fwd</span></label>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #7C9CFF">+18.80 <span style="font-size: 11px; color: #8B98A9">m/s · was +19.84</span></span>
+      </div>
+      <input id="m-s" type="range" min="-25" max="25" step="0.01" value="18.8" style="width: 100%; height: 28px">
+    </div>
+    <div style="padding: 10px 12px; background: #121820; border: 1px solid #243042; border-radius: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; line-height: 1.5">
+      <div><span style="color: #8B98A9">|Δv|</span> 18.80 m/s <span style="color: #8B98A9">· Ap/Pe after</span> 420.0/416.3 km</div>
+      <div style="font-family: 'IBM Plex Sans', sans-serif; color: #8B98A9">Under-burn leaves the Chaser slightly low, so it drifts past the Target.</div>
+    </div>
+    <div style="flex: 1 1 auto"></div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <button type="button" style="height: 48px; background: transparent; color: #E6EDF3; border: 1px solid #3A4A5F; border-radius: 10px; font-size: 15px">Cancel</button>
+      <button type="button" style="height: 48px; background: #7C9CFF; color: #0B0F14; border: 0; border-radius: 10px; font-size: 15px; font-weight: 600">Done</button>
+    </div>
+  </section>
+</div>
+</body>
+</html>
