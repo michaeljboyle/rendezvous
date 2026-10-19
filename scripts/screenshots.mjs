@@ -5,16 +5,17 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 
 const PORT = 4179;
-const exe = process.env.CHROMIUM_PATH || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium'].find((p) => fs.existsSync(p));
-const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
-const base = `http://localhost:${PORT}/`;
+// BASE_URL tests an already-running or deployed site (e.g. GitHub Pages); otherwise serve dist/ locally.
+const exe = process.env.CHROMIUM_PATH || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((p) => fs.existsSync(p));
+const server = process.env.BASE_URL ? null : spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+const base = process.env.BASE_URL ? process.env.BASE_URL.replace(/\/?$/, '/') : `http://localhost:${PORT}/`;
 for (let i = 0; i < 50; i++) {
   try {
-    await fetch(base);
-    break;
+    if ((await fetch(base)).ok) break;
   } catch {
-    await new Promise((r) => setTimeout(r, 200));
+    /* not up yet */
   }
+  await new Promise((r) => setTimeout(r, 200));
 }
 fs.mkdirSync('screenshots', { recursive: true });
 const browser = await chromium.launch({ executablePath: exe });
@@ -53,7 +54,7 @@ for (const s of shots) {
   await ctx.close();
 }
 await browser.close();
-server.kill();
+server?.kill();
 if (errors.length) {
   console.error(errors.join('\n'));
   process.exit(1);

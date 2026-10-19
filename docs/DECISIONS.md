@@ -42,5 +42,5 @@ These are choices made while building v1 where the spec was silent, ambiguous, o
 
 ## Testing
 
-27. Browser checks use `playwright-core` scripts (`scripts/e2e.mjs`, `scripts/screenshots.mjs`) against the built app, not the `@playwright/test` runner. CI runs Vitest and the build; the browser scripts need a Chromium binary and are run locally.
+27. Browser checks use `playwright-core` scripts (`scripts/e2e.mjs`, `scripts/screenshots.mjs`), not the `@playwright/test` runner. CI runs them on every PR against the build (the `browser` job, which uploads the screenshots as an artifact). After each deploy, the `smoke` job runs them again against the live Pages URL (`BASE_URL`).
 28. Verified in Chromium at 1440 × 900/1000, 1024 × 768, 390 × 844 and 844 × 390, including 60 fps at 600× under 4× CPU throttling. Safari, Firefox and real iPhone/Android devices have not been tested yet.

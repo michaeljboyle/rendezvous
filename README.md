@@ -16,7 +16,7 @@ npm run e2e        # browser checks against the build (needs Chromium; see below
 npm run screenshots  # PNGs at the mockup viewports into screenshots/
 ```
 
-`e2e` and `screenshots` use `playwright-core` with a local Chromium (`CHROMIUM_PATH`, or the preinstalled `/opt/pw-browsers` build).
+`e2e` and `screenshots` use `playwright-core`. They pick up Chromium from `CHROMIUM_PATH`, or use the build installed by `npx playwright-core install chromium`. They serve `dist/` locally unless `BASE_URL` points them at a running or deployed site, e.g. `BASE_URL=https://michaeljboyle.github.io/rendezvous/ npm run e2e`. CI runs both on every PR, and again against the live site after each deploy; screenshots are uploaded as a workflow artifact.
 
 Deep links for demos and checks: `?preset=phasing|undock|vbar|rbar|sandbox`, `&t=<seconds>`, `&view=orbits|lvlh|plot` (phone). A share link (`#s=…`) carries a whole scenario.
 

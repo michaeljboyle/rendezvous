@@ -3,18 +3,21 @@ import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
 
 const PORT = 4180;
-const exe = process.env.CHROMIUM_PATH || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium'].find((p) => fs.existsSync(p));
-const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
-const base = `http://localhost:${PORT}/`;
+// BASE_URL tests an already-running or deployed site (e.g. GitHub Pages); otherwise serve dist/ locally.
+const exe = process.env.CHROMIUM_PATH || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((p) => fs.existsSync(p));
+const server = process.env.BASE_URL ? null : spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+const base = process.env.BASE_URL ? process.env.BASE_URL.replace(/\/?$/, '/') : `http://localhost:${PORT}/`;
 for (let i = 0; i < 50; i++) {
   try {
-    await fetch(base);
-    break;
+    if ((await fetch(base)).ok) break;
   } catch {
-    await new Promise((r) => setTimeout(r, 200));
+    /* not up yet */
   }
+  await new Promise((r) => setTimeout(r, 200));
 }
 const browser = await chromium.launch({ executablePath: exe });
 let failures = 0;
@@ -154,7 +157,7 @@ const R = (page, fn, arg) => page.evaluate(fn, arg);
   });
 
   await check('JSON import loads a scenario', async () => {
-    const f = '/tmp/rv-import.json';
+    const f = path.join(os.tmpdir(), 'rv-import.json');
     fs.writeFileSync(f, fs.readFileSync('src/scenarios/presets/3-vbar.json'));
     await page.locator('input[type=file]').setInputFiles(f);
     await page.waitForTimeout(200);
@@ -325,6 +328,6 @@ const R = (page, fn, arg) => page.evaluate(fn, arg);
 }
 
 await browser.close();
-server.kill();
+server?.kill();
 console.log(failures ? `${failures} check(s) failed` : 'all checks passed');
 process.exit(failures ? 1 : 0);
