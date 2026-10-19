@@ -1,6 +1,6 @@
 # Rendezvous Simulator
 
-A browser app that shows two spacecraft (Target and Chaser) in three synchronized views (inertial orbits, LVLH now, LVLH rendezvous plot) so viewers can see how elliptical orbits become relative-motion plots. Users play preset scenarios or add their own burns and watch them play out.
+A browser app that shows two spacecraft (Target and Chaser) in synchronized views (inertial orbits and the LVLH rendezvous plot) so viewers can see how elliptical orbits become relative-motion plots. The spec's separate "LVLH now" view was later folded into the rendezvous plot (see Decisions below). Users play preset scenarios or add their own burns and watch them play out.
 
 ## Source of truth
 
@@ -22,6 +22,7 @@ A browser app that shows two spacecraft (Target and Chaser) in three synchronize
 - Fonts: IBM Plex Sans (UI) and IBM Plex Mono (all changing numbers).
 - TypeScript + Vite, Canvas 2D views, no backend; deploy to GitHub Pages with a GitHub Actions workflow.
 - Write all code fresh. Do not reuse any earlier orbit.js / orbit-viz.html.
+- No separate LVLH-now view: the rendezvous plot covers it (Fit · Follow · Manual scaling, KOS/AE, velocity arrow, LVLH telemetry) and is curvilinear by default. The mockups and spec still show three views; this overrides them. See `docs/DECISIONS.md` #8–9.
 
 ## Working rules
 
@@ -33,5 +34,5 @@ A browser app that shows two spacecraft (Target and Chaser) in three synchronize
   5. Phone and tablet layouts, then the GitHub Pages workflow.
 - Physics code is pure TypeScript with no DOM access.
 - Before calling a view done, open the matching mockup and your build side by side at the same viewport (1440 × 1000 or 390 × 844) and compare them.
-- **Cross-check:** the mockups show preset 1 (Phasing from below) at T+01:05:00. Loading that preset at that time should give, within rounding: range 51.26 km, range rate −74.96 m/s, Chaser altitude 377.9 km, Chaser Ap/Pe 420.0 / 350.0 km, phase −0.25°, LVLH (rectilinear) V −29.19 km, R −42.14 km. Add this as a test.
+- **Cross-check:** the mockups show preset 1 (Phasing from below) at T+01:05:00. Loading that preset at that time should give, within rounding: range 51.26 km, range rate −74.96 m/s, Chaser altitude 377.9 km, Chaser Ap/Pe 420.0 / 350.0 km, phase −0.25°, LVLH (rectilinear) V −29.19 km, R −42.14 km. Add this as a test. (The plot shows these V/R values in Rectilinear mode; Curvilinear, the default, reads −29.37 / −42.08.)
 - Units: SI internally (m, s, rad); format for display only.

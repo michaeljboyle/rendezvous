@@ -2,7 +2,7 @@ export type Coords = 'curv' | 'rect';
 
 /** View options shared by more than one view. Writes go through here so the views can't disagree. */
 export class ViewSettings {
-  /** LVLH coordinates for the LVLH-now view and the rendezvous plot. */
+  /** LVLH coordinates for the rendezvous plot (curvilinear by default). */
   coords: Coords = 'curv';
   private listeners = new Set<() => void>();
 

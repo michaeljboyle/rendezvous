@@ -3,12 +3,12 @@ import { h } from './dom';
 
 const LABEL = { curv: 'Curvilinear', rect: 'Rectilinear' } as const;
 const TITLE =
-  'Curvilinear: V-bar is arc length along the Target orbit, R-bar is altitude difference. Rectilinear: straight-line offsets from the Target. Shared by the LVLH and rendezvous plot views.';
+  'Curvilinear: V-bar is arc length along the Target orbit, R-bar is altitude difference. Rectilinear: straight-line offsets from the Target.';
 
 /** Title-row chip that flips the shared LVLH coordinates; its label follows the setting. */
 export function coordsChip(app: AppCtx): HTMLButtonElement {
   const s = app.settings;
-  const btn = h('button', { type: 'button', class: 'chip hide-phone', title: TITLE, onclick: () => s.setCoords(s.coords === 'curv' ? 'rect' : 'curv') }, LABEL[s.coords]);
+  const btn = h('button', { type: 'button', class: 'chip hide-phone hide-compact', title: TITLE, onclick: () => s.setCoords(s.coords === 'curv' ? 'rect' : 'curv') }, LABEL[s.coords]);
   s.subscribe(() => (btn.textContent = LABEL[s.coords]));
   return btn;
 }
