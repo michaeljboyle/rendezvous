@@ -7,7 +7,7 @@
   "chaser": {
     "circular": {
       "altitudeKm": 350,
-      "phaseDeg": -4.15683
+      "phaseDeg": -4.156846
     }
   },
   "durationS": 9000,
@@ -17,16 +17,16 @@
       "tigS": 2700,
       "dv": {
         "r": 0,
-        "s": 19.89
+        "s": 19.89072
       },
       "enabled": true
     },
     {
       "name": "Circularize",
-      "tigS": 5468,
+      "tigS": 5467.6,
       "dv": {
         "r": 0,
-        "s": 19.84
+        "s": 19.83932
       },
       "enabled": true
     }

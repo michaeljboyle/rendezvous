@@ -1,4 +1,4 @@
-import { alpha, theme } from './theme';
+import { theme } from './theme';
 
 export const DASH = [5, 4];
 
@@ -106,28 +106,6 @@ export function label(c: CanvasRenderingContext2D, text: string, x: number, y: n
   c.strokeText(text, x, y);
   c.fillStyle = color;
   c.fillText(text, x, y);
-  c.restore();
-}
-
-/** A polyline drawn with a fading alpha from `a0` at the first point to `a1` at the last. */
-export function fadingPolyline(c: CanvasRenderingContext2D, xs: number[], ys: number[], color: string, width: number, a0: number, a1: number): void {
-  const n = xs.length;
-  if (n < 2) return;
-  const bands = Math.min(24, n - 1);
-  c.save();
-  c.lineWidth = width;
-  c.lineCap = 'round';
-  c.lineJoin = 'round';
-  for (let b = 0; b < bands; b++) {
-    const i0 = Math.floor((b * (n - 1)) / bands);
-    const i1 = Math.floor(((b + 1) * (n - 1)) / bands);
-    const f = (b + 0.5) / bands;
-    c.strokeStyle = alpha(color, a0 + (a1 - a0) * f);
-    c.beginPath();
-    c.moveTo(xs[i0], ys[i0]);
-    for (let i = i0 + 1; i <= i1; i++) c.lineTo(xs[i], ys[i]);
-    c.stroke();
-  }
   c.restore();
 }
 

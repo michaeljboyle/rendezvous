@@ -33,6 +33,8 @@ const shots = [
   // Follow mode close in, with the keep-out sphere and approach ellipsoid.
   { name: 'plot-follow-vbar', vp: { width: 1440, height: 1000 }, q: '?preset=vbar&t=8000', follow: true, overlays: true, clip: '#view-plot' },
   { name: 'phone-follow', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true, follow: true },
+  // Orbits zoomed in hard around the Target: orbits and trails must stay smooth curves.
+  { name: 'orbits-zoom', vp: { width: 1440, height: 1000 }, q: '?preset=phasing&t=3900', orbitsZoom: 12, clip: '#view-inertial' },
   { name: 'desktop-vbar', vp: { width: 1440, height: 1000 }, q: '?preset=vbar&t=4000' },
   { name: 'desktop-rbar', vp: { width: 1440, height: 1000 }, q: '?preset=rbar&t=2000' },
   { name: 'desktop-undock', vp: { width: 1440, height: 1000 }, q: '?preset=undock&t=7000' },
@@ -55,6 +57,15 @@ for (const s of shots) {
     });
   }
   if (s.rect) await page.evaluate(() => window.rendezvous.settings.setCoords('rect'));
+  if (s.orbitsZoom) {
+    await page.evaluate((z) => {
+      const v = window.rendezvous.views.inertial;
+      v.camera = 'follow';
+      v.cam.set('follow');
+      v.zoom = z;
+      window.rendezvous.clock.setTime(window.rendezvous.clock.t);
+    }, s.orbitsZoom);
+  }
   if (s.plotManual || s.follow || s.overlays) {
     await page.evaluate((s) => {
       const p = window.rendezvous.views.plot;

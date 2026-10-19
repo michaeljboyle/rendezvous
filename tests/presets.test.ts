@@ -32,13 +32,23 @@ describe('presets', () => {
 
   it('preset 1 ends 5 km behind on V-bar, co-circular', () => {
     const t = tl('phasing');
-    const atCirc = relativeAt(t, 5468);
+    const atCirc = relativeAt(t, presetById('phasing')!.scenario.burns[1].tigS);
     expect(Math.abs(atCirc.curv.v + 5000)).toBeLessThan(50);
     expect(Math.abs(atCirc.curv.r)).toBeLessThan(25);
     const end = relativeAt(t, t.duration);
     expect(Math.abs(end.curv.v + 5000)).toBeLessThan(100); // 2% of 5 km
     expect(Math.abs(end.curv.r)).toBeLessThan(25);
     expect(Math.abs(end.rangeRate)).toBeLessThan(0.1);
+  });
+
+  it('preset 1 is an exact Hohmann transfer: apoapsis 420 km, then circular at 420 km', () => {
+    const t = tl('phasing');
+    const xfer = chaserElementsAt(t, 3000);
+    expect(Math.abs(xfer.ra - xfer.rp)).toBeGreaterThan(60e3);
+    expect(Math.abs((xfer.ra - RE) / 1e3 - 420)).toBeLessThan(0.01);
+    const end = chaserElementsAt(t, t.duration);
+    expect(end.ra - end.rp).toBeLessThan(10); // circular to within metres
+    expect(Math.abs((end.a - RE) / 1e3 - 420)).toBeLessThan(0.01);
   });
 
   it('preset 2 ends ahead of and below the Target, range > 10 km', () => {

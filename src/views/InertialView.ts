@@ -1,14 +1,14 @@
-import { RE } from '../physics/constants';
+import { RE, SAMPLE_DT } from '../physics/constants';
 import type { Elements, State } from '../physics/kepler';
 import { localAxes } from '../physics/frames';
-import { chaserAt, sampleIndex, segmentIndexAt, targetAt, type Timeline } from '../physics/timeline';
+import { chaserAt, segmentIndexAt, targetAt, type Timeline } from '../physics/timeline';
 import { phaseAngle } from '../physics/frames';
 import type { AppCtx, View } from '../ui/context';
 import { h, icon, segmented, setText } from '../ui/dom';
 import { num } from '../ui/format';
 import { panel, telemetryItem } from '../ui/panel';
 import { Surface } from './canvas';
-import { arrow, drawBurnMarker, drawChaser, drawTarget, fadingPolyline, label, mono } from './draw';
+import { arrow, drawBurnMarker, drawChaser, drawTarget, label, mono } from './draw';
 import { attachGestures, type Pt } from './gestures';
 import { alpha, theme } from './theme';
 
@@ -185,28 +185,87 @@ export class InertialView implements View {
     return { x: sx / n, y: sy / n };
   }
 
-  private orbitPath(c: CanvasRenderingContext2D, el: Elements): void {
-    const sgn = el.h >= 0 ? 1 : -1;
-    const N = 256;
-    let numax = Math.PI;
-    if (el.e >= 1) numax = Math.acos(-1 / el.e) - 0.02;
-    const rmax = 12 * RE;
+  /**
+   * Sample a curve f(u), u ∈ [u0, u1], for drawing. A coarse pass finds the pieces that touch the
+   * viewport; only those are subdivided (to ~3 px chords), so curves stay smooth at any zoom without
+   * sampling the off-screen part finely. f returns null where the curve is undefined (a break).
+   */
+  private sampleCurve(f: (u: number) => Pt | null, u0: number, u1: number, coarse: number): ({ p: Pt; u: number } | null)[] {
+    const W = this.surface.w;
+    const H = this.surface.h;
+    const out: ({ p: Pt; u: number } | null)[] = [];
+    let prev = f(u0);
+    out.push(prev ? { p: prev, u: u0 } : null);
+    for (let i = 1; i <= coarse; i++) {
+      const ua = u0 + ((u1 - u0) * (i - 1)) / coarse;
+      const ub = u0 + ((u1 - u0) * i) / coarse;
+      const q = f(ub);
+      if (prev && q) {
+        const chord = Math.hypot(q.x - prev.x, q.y - prev.y);
+        // Margin covers how far the true curve can bulge beyond the chord.
+        const m = 0.15 * chord + 4;
+        const visible = Math.max(prev.x, q.x) + m >= 0 && Math.min(prev.x, q.x) - m <= W && Math.max(prev.y, q.y) + m >= 0 && Math.min(prev.y, q.y) - m <= H;
+        const n = visible ? Math.min(4096, Math.ceil(chord / 3)) : 1;
+        for (let k = 1; k < n; k++) {
+          const u = ua + ((ub - ua) * k) / n;
+          const p = f(u);
+          out.push(p ? { p, u } : null);
+        }
+      }
+      out.push(q ? { p: q, u: ub } : null);
+      prev = q;
+    }
+    return out;
+  }
+
+  private tracePoints(c: CanvasRenderingContext2D, pts: ({ p: Pt } | null)[]): void {
     let started = false;
-    for (let i = 0; i <= N; i++) {
-      const nu = el.e >= 1 ? -numax + (2 * numax * i) / N : (2 * Math.PI * i) / N;
-      const r = el.p / (1 + el.e * Math.cos(nu));
-      if (!(r > 0) || r > rmax) {
+    for (const s of pts) {
+      if (!s) {
         started = false;
         continue;
       }
-      const ang = el.argp + sgn * nu;
-      const s = this.pt(r * Math.cos(ang), r * Math.sin(ang));
-      if (!started) {
-        c.moveTo(s.x, s.y);
-        started = true;
-      } else c.lineTo(s.x, s.y);
+      if (started) c.lineTo(s.p.x, s.p.y);
+      else c.moveTo(s.p.x, s.p.y);
+      started = true;
     }
-    if (el.e < 1) c.closePath();
+  }
+
+  private orbitPath(c: CanvasRenderingContext2D, el: Elements): void {
+    const sgn = el.h >= 0 ? 1 : -1;
+    const closed = el.e < 1;
+    const numax = closed ? Math.PI : Math.acos(-1 / el.e) - 0.02;
+    const rmax = 12 * RE;
+    const f = (nu: number): Pt | null => {
+      const r = el.p / (1 + el.e * Math.cos(nu));
+      if (!(r > 0) || r > rmax) return null;
+      const ang = el.argp + sgn * nu;
+      return this.pt(r * Math.cos(ang), r * Math.sin(ang));
+    };
+    this.tracePoints(c, this.sampleCurve(f, -numax, numax, 720));
+    if (closed) c.closePath();
+  }
+
+  private alignState = new Map<string, CanvasTextAlign>();
+
+  /**
+   * Text alignment for a label placed along screen direction dx: left when it points right, right when
+   * it points left, centred when it is near-vertical. Hysteresis stops the label flipping sides from
+   * frame to frame when dx hovers at a boundary (e.g. the Target in Follow mode, where dx ≈ 0).
+   */
+  private alignFor(key: string, dx: number): CanvasTextAlign {
+    const prev = this.alignState.get(key) ?? 'center';
+    const enter = 0.35;
+    const exit = 0.25;
+    let next: CanvasTextAlign = prev;
+    if (prev === 'center') {
+      if (dx > enter) next = 'left';
+      else if (dx < -enter) next = 'right';
+    } else if (prev === 'left' ? dx < exit : dx > -exit) {
+      next = Math.abs(dx) > enter ? (dx > 0 ? 'left' : 'right') : 'center';
+    }
+    this.alignState.set(key, next);
+    return next;
   }
 
   private apsisPoints(el: Elements): { ap: Pt; pe: Pt } {
@@ -346,13 +405,22 @@ export class InertialView implements View {
     drawTarget(c, tS.x, tS.y, 10);
     drawChaser(c, cS.x, cS.y, 5);
     mono(c, 12);
+    // Target label outward from Earth, Chaser label inward; alignment is hysteretic (no flicker).
     const out = this.dir(T.x, T.y);
-    c.textAlign = out.x >= 0 ? 'left' : 'right';
-    label(c, 'Target', tS.x + out.x * 40 + (out.x >= 0 ? 6 : -6), tS.y + out.y * 40, th.target);
+    const ta = this.alignFor('target', out.x);
+    if (ta === 'center') {
+      // Near-vertical: the triad's R arrow points the same way, so sit beside it, not on it.
+      c.textAlign = 'left';
+      label(c, 'Target', tS.x + out.x * 30 + 12, tS.y + out.y * 30, th.target);
+    } else {
+      c.textAlign = ta;
+      label(c, 'Target', tS.x + out.x * 40 + (ta === 'left' ? 6 : -6), tS.y + out.y * 40, th.target);
+    }
     const cin = this.dir(C.x, C.y);
-    c.textAlign = cin.x >= 0 ? 'right' : 'left';
+    const ca = this.alignFor('chaser', -cin.x);
+    c.textAlign = ca;
     const sep = Math.hypot(cS.x - tS.x, cS.y - tS.y) < 24 ? 26 : 16;
-    label(c, 'Chaser', cS.x - cin.x * sep + (cin.x >= 0 ? -4 : 4), cS.y - cin.y * sep, th.chaser);
+    label(c, 'Chaser', cS.x - cin.x * sep + (ca === 'left' ? 4 : ca === 'right' ? -4 : 0), cS.y - cin.y * sep, th.chaser);
 
     // Legend
     this.drawLegend(c, tl, seg.el, !!prevSeg, !!ghost);
@@ -368,14 +436,20 @@ export class InertialView implements View {
 
   private drawGhostPath(c: CanvasRenderingContext2D, g: Timeline, t: number): void {
     const th = theme();
-    const i0 = sampleIndex(g, t);
+    if (t >= g.duration) return;
+    const coarse = Math.max(2, Math.ceil((g.duration - t) / SAMPLE_DT));
+    const pts = this.sampleCurve(
+      (u) => {
+        const s = chaserAt(g, u);
+        return this.pt(s.x, s.y);
+      },
+      t,
+      g.duration,
+      coarse,
+    );
     c.save();
     c.beginPath();
-    for (let i = i0; i < g.count; i++) {
-      const s = this.pt(g.cx[i], g.cy[i]);
-      if (i === i0) c.moveTo(s.x, s.y);
-      else c.lineTo(s.x, s.y);
-    }
+    this.tracePoints(c, pts);
     c.setLineDash([3, 4]);
     c.strokeStyle = alpha(th.text, 0.35);
     c.lineWidth = 1.2;
@@ -385,22 +459,44 @@ export class InertialView implements View {
 
   private drawTrail(c: CanvasRenderingContext2D, tl: Timeline, t: number, who: 'target' | 'chaser', color: string): void {
     const t0 = Math.max(0, t - 0.1 * tl.targetPeriod);
-    const i0 = sampleIndex(tl, t0);
-    const i1 = sampleIndex(tl, t);
-    const xs: number[] = [];
-    const ys: number[] = [];
-    const X = who === 'target' ? tl.tx : tl.cx;
-    const Y = who === 'target' ? tl.ty : tl.cy;
-    for (let i = i0; i <= i1; i++) {
-      const s = this.pt(X[i], Y[i]);
-      xs.push(s.x);
-      ys.push(s.y);
+    if (t <= t0) return;
+    const at = who === 'target' ? (u: number) => targetAt(tl, u) : (u: number) => chaserAt(tl, u);
+    const pts = this.sampleCurve(
+      (u) => {
+        const s = at(u);
+        return this.pt(s.x, s.y);
+      },
+      t0,
+      t,
+      Math.max(2, Math.ceil((t - t0) / SAMPLE_DT)),
+    );
+    // Fade from transparent (oldest) to 0.9 at the vehicle, in bands of equal time.
+    const BANDS = 24;
+    c.save();
+    c.lineWidth = 3;
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    let band = -1;
+    let last: Pt | null = null;
+    for (const s of pts) {
+      if (!s) {
+        last = null;
+        continue;
+      }
+      const b = Math.min(BANDS - 1, Math.floor(((s.u - t0) / (t - t0)) * BANDS));
+      if (b !== band) {
+        if (band >= 0) c.stroke();
+        band = b;
+        c.strokeStyle = alpha(color, (0.9 * (b + 0.5)) / BANDS);
+        c.beginPath();
+        if (last) c.moveTo(last.x, last.y);
+        else c.moveTo(s.p.x, s.p.y);
+      }
+      c.lineTo(s.p.x, s.p.y);
+      last = s.p;
     }
-    const now = who === 'target' ? targetAt(tl, t) : chaserAt(tl, t);
-    const s = this.pt(now.x, now.y);
-    xs.push(s.x);
-    ys.push(s.y);
-    fadingPolyline(c, xs, ys, color, 3, 0, 0.9);
+    if (band >= 0) c.stroke();
+    c.restore();
   }
 
   private drawBurns(c: CanvasRenderingContext2D, tl: Timeline, t: number): void {
@@ -413,6 +509,8 @@ export class InertialView implements View {
     const placed: { x0: number; y0: number; x1: number; y1: number }[] = [{ x0: 0, y0: 0, x1: compact ? 260 : 330, y1: (compact ? 6 : 12) + legendLines * 22 }];
     for (const b of tl.burns) {
       const s = this.pt(b.pre.x, b.pre.y);
+      // Off-screen burns get no marker or label (clamping their labels to the edge was misleading).
+      if (s.x < -10 || s.x > this.surface.w + 10 || s.y < -10 || s.y > this.surface.h + 10) continue;
       const past = b.tig <= t;
       // Δv arrow
       const d = this.dir(b.post.vx - b.pre.vx, b.post.vy - b.pre.vy);
@@ -428,13 +526,15 @@ export class InertialView implements View {
       const near = (x: number) => Math.abs(r - x) < 500;
       const apsis =
         b.before.e > 1e-3 && near(b.before.ra) ? 'Ap' : b.before.e > 1e-3 && near(b.before.rp) ? 'Pe' : b.after.e > 1e-3 && near(b.after.rp) ? 'Pe' : b.after.e > 1e-3 && near(b.after.ra) ? 'Ap' : 'Alt';
-      c.textAlign = out.x >= 0 ? 'left' : 'right';
+      const ba = this.alignFor(`burn${b.index}`, out.x);
+      c.textAlign = ba;
       c.textBaseline = 'middle';
       mono(c, 12);
       const l1 = `${store.numbers[b.index]} ${burn.name}`;
       const l2 = `${apsis} ${num((r - RE) / 1000, 1)} km`;
       const w = Math.max(c.measureText(l1).width, c.measureText(l2).width);
-      const box = out.x >= 0 ? { x0: lx, y0: ly - 15, x1: lx + w, y1: ly + 15 } : { x0: lx - w, y0: ly - 15, x1: lx, y1: ly + 15 };
+      const bx0 = ba === 'left' ? lx : ba === 'right' ? lx - w : lx - w / 2;
+      const box = { x0: bx0, y0: ly - 15, x1: bx0 + w, y1: ly + 15 };
       if (placed.some((p) => box.x0 < p.x1 && box.x1 > p.x0 && box.y0 < p.y1 && box.y1 > p.y0)) {
         const nb = { x0: s.x - 18, y0: s.y + 8, x1: s.x + 18, y1: s.y + 22 };
         if (!placed.some((p) => nb.x0 < p.x1 && nb.x1 > p.x0 && nb.y0 < p.y1 && nb.y1 > p.y0)) {
