@@ -1,0 +1,70 @@
+{
+  "name": "Multi-stage phasing",
+  "description": "Catching up from 3,200 km behind the way real vehicles do: two phasing ellipses set how fast the Chaser gains on the Target, a height adjust and circularization put it 5 km behind, then a terminal-initiation hop and brake bring it to a 200 m hold.",
+  "target": {
+    "altitudeKm": 420
+  },
+  "chaser": {
+    "circular": {
+      "altitudeKm": 250,
+      "phaseDeg": -26.892158
+    }
+  },
+  "durationS": 26767,
+  "burns": [
+    {
+      "name": "Phase 1",
+      "tigS": 1800,
+      "dv": {
+        "r": 0,
+        "s": 23.22463
+      },
+      "enabled": true
+    },
+    {
+      "name": "Phase 2",
+      "tigS": 9928.5,
+      "dv": {
+        "r": 0,
+        "s": 43.13443
+      },
+      "enabled": true
+    },
+    {
+      "name": "Height adjust",
+      "tigS": 18194.5,
+      "dv": {
+        "r": 0,
+        "s": 25.574
+      },
+      "enabled": true
+    },
+    {
+      "name": "Circularize",
+      "tigS": 20977.4,
+      "dv": {
+        "r": 0,
+        "s": 5.64226
+      },
+      "enabled": true
+    },
+    {
+      "name": "TI",
+      "tigS": 22177.4,
+      "dv": {
+        "r": -1.35087,
+        "s": -0.00034
+      },
+      "enabled": true
+    },
+    {
+      "name": "Brake",
+      "tigS": 24966.5,
+      "dv": {
+        "r": -1.35099,
+        "s": 0.00034
+      },
+      "enabled": true
+    }
+  ]
+}

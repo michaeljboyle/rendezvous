@@ -36,6 +36,8 @@ const shots = [
   { name: 'phone-follow', vp: { width: 390, height: 844 }, q: '?preset=phasing&t=3900&view=plot', mobile: true, follow: true },
   // Orbits zoomed in hard around the Target: orbits and trails must stay smooth curves.
   { name: 'orbits-zoom', vp: { width: 1440, height: 1000 }, q: '?preset=phasing&t=3900', orbitsZoom: 12, clip: '#view-inertial' },
+  { name: 'desktop-multiphase', vp: { width: 1440, height: 1000 }, q: '?preset=multiphase&t=12000' },
+  { name: 'desktop-multiphase-final', vp: { width: 1440, height: 1000 }, q: '?preset=multiphase&t=23500', follow: true, overlays: true },
   { name: 'desktop-vbar', vp: { width: 1440, height: 1000 }, q: '?preset=vbar&t=4000' },
   { name: 'desktop-rbar', vp: { width: 1440, height: 1000 }, q: '?preset=rbar&t=2000' },
   { name: 'desktop-undock', vp: { width: 1440, height: 1000 }, q: '?preset=undock&t=7000' },

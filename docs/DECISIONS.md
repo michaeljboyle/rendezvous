@@ -12,6 +12,17 @@ These are choices made while building v1 where the spec was silent, ambiguous, o
 6. The Target starts at the top of the fixed inertial view and orbits counter-clockwise.
 7. Propagation uses universal variables, so escape trajectories from very large burns still propagate and draw.
 
+7a. **Preset 5, Multi-stage phasing, was added after v1 at the user's request; Sandbox moved to 6.** The profile follows a real ISS-style approach:
+   - **Start:** 250 km circular parking orbit, 3,190 km behind the Target (phase −26.892158°).
+   - **Phase 1** at T+0:30: raise apogee to 330 km, giving a 250 × 330 km phasing ellipse. Coast 1.5 orbits.
+   - **Phase 2** at that apogee: raise the far side to 400 km, giving a 330 × 400 km ellipse. Coast 1.5 orbits.
+   - **Height adjust** at 400 km: raise the far side to 420 km.
+   - **Circularize** half an orbit later, exactly 5 km behind the Target.
+   - **TI** 20 min later: a half-orbit hop to 200 m behind.
+   - **Brake:** stops the Chaser there.
+
+   All values are exact two-body ones. The along-track burns are vis-viva Δvs timed at apsides. The initial phase is solved so the Chaser arrives exactly 5 km behind. TI is solved by two-body shooting (`solveTransfer`), and Brake nulls the LVLH velocity. The scenario lasts 7.4 h (4.8 Target orbits) and uses 100.28 m/s in total. Tests check every Ap/Pe, the closing V-bar gap at each stage, and the 200 m hold.
+
 ## Views
 
 8. **There is no separate LVLH-now view (spec View 2); the rendezvous plot does its job.** Everything View 2 showed is now on the plot:
