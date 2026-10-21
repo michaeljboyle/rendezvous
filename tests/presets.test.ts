@@ -8,8 +8,8 @@ import { totalDv } from '../src/physics/burns';
 const tl = (id: string) => buildTimeline(presetById(id)!.scenario);
 
 describe('presets', () => {
-  it('all five presets load and pass the schema', () => {
-    expect(PRESETS).toHaveLength(5);
+  it('all six presets load and pass the schema', () => {
+    expect(PRESETS).toHaveLength(6);
     for (const p of PRESETS) expect(buildTimeline(p.scenario).count).toBeGreaterThan(100);
   });
 
@@ -90,6 +90,37 @@ describe('presets', () => {
     // Just after the stop burn the Chaser is momentarily at rest.
     const after = relativeAt(t, 4800);
     expect(Math.hypot(after.rect.vv, after.rect.vr)).toBeLessThan(0.002);
+  });
+
+  it('preset 5 phases through two ellipses, circularizes 5 km behind, then holds 200 m behind', () => {
+    const p = presetById('multiphase')!.scenario;
+    const t = tl('multiphase');
+    const alt = (x: number) => (x - RE) / 1e3;
+    // Apoapsis / periapsis after each burn (km)
+    const expected: [number, number][] = [
+      [330, 250], // Phase 1: first phasing ellipse
+      [400, 330], // Phase 2: second phasing ellipse
+      [420, 400], // Height adjust
+      [420, 420], // Circularize
+    ];
+    expected.forEach(([ap, pe], k) => {
+      const e = chaserElementsAt(t, p.burns[k].tigS + 1);
+      expect(Math.abs(alt(e.ra) - ap)).toBeLessThan(0.01);
+      expect(Math.abs(alt(e.rp) - pe)).toBeLessThan(0.01);
+    });
+    // Each stage closes the gap: thousands of km → 5 km behind on V-bar at circularization
+    const vAt = (k: number) => relativeAt(t, p.burns[k].tigS).curv.v;
+    expect(vAt(0)).toBeLessThan(-2000e3);
+    expect(vAt(0)).toBeLessThan(vAt(1));
+    expect(vAt(1)).toBeLessThan(vAt(2));
+    expect(Math.abs(vAt(3) + 5000)).toBeLessThan(50);
+    // Terminal initiation hop arrives within 2% of its 4.8 km leg, then the brake leaves it at rest
+    const brake = p.burns[5].tigS;
+    const arr = relativeAt(t, brake);
+    expect(Math.hypot(arr.rect.v + 200, arr.rect.r)).toBeLessThan(0.02 * 4800);
+    const end = relativeAt(t, t.duration);
+    expect(Math.hypot(end.rect.v + 200, end.rect.r)).toBeLessThan(5);
+    expect(Math.hypot(end.rect.vv, end.rect.vr)).toBeLessThan(0.005);
   });
 
   it('sandbox starts 1 km behind, co-circular, no burns', () => {
